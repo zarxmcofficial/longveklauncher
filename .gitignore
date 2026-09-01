@@ -1,0 +1,25 @@
+Dependencies
+
+node_modules/
+
+Production builds
+
+dist/
+dist-unpacked/
+
+Logs & Temporary files
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+
+Environment variables
+
+.env
+.env.local
+
+Minecraft runtime caches
+
+runtimes/*.zip
