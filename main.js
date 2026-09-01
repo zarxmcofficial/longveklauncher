@@ -89,6 +89,14 @@ async function updateRPCActivity() {
 
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.allowPrerelease = false;
+
+// ភ្ជាប់ Provider ទៅកាន់ GitHub Repository ដោយផ្ទាល់
+autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'zarxmcofficial',
+    repo: 'longveklauncher'
+});
 
 function sendSplashStatus(msg, progress = -1, isDone = false) {
     if (splashWindow && !splashWindow.isDestroyed()) {
@@ -98,16 +106,19 @@ function sendSplashStatus(msg, progress = -1, isDone = false) {
 
 function initAutoUpdater() {
     autoUpdater.on('checking-for-update', () => {
-        sendSplashStatus('Checking for launcher updates...', 15);
+        console.log('[AutoUpdater] Checking for updates on GitHub...');
+        sendSplashStatus('Checking for launcher updates...', 20);
     });
 
     autoUpdater.on('update-available', (info) => {
         updateInProgress = true;
-        sendSplashStatus(`New version v${info.version} found! Downloading...`, 30);
+        console.log(`[AutoUpdater] Update found: v${info.version}`);
+        sendSplashStatus(`New version v${info.version} found! Downloading...`, 35);
     });
 
-    autoUpdater.on('update-not-available', () => {
-        sendSplashStatus('Launcher is up to date!', 90);
+    autoUpdater.on('update-not-available', (info) => {
+        console.log('[AutoUpdater] Up to date:', info ? info.version : 'Latest');
+        sendSplashStatus('Launcher is up to date!', 100);
         setTimeout(() => {
             finishSplashAndOpenMain();
         }, 800);
@@ -115,22 +126,25 @@ function initAutoUpdater() {
 
     autoUpdater.on('download-progress', (progressObj) => {
         const percent = Math.round(progressObj.percent || 0);
+        console.log(`[AutoUpdater] Downloading: ${percent}%`);
         sendSplashStatus(`Downloading update: ${percent}%`, percent);
     });
 
     autoUpdater.on('update-downloaded', (info) => {
+        console.log(`[AutoUpdater] Update v${info.version} downloaded successfully!`);
         sendSplashStatus(`Update v${info.version} ready! Restarting...`, 100, true);
         setTimeout(() => {
-            autoUpdater.quitAndInstall();
+            // បញ្ជាឱ្យបិទកម្មវិធីរួចដំឡើង Setup ថ្មីភ្លាមៗ
+            autoUpdater.quitAndInstall(false, true);
         }, 1500);
     });
 
     autoUpdater.on('error', (err) => {
-        console.error('Auto Updater Error:', err ? err.message : 'Unknown error');
-        sendSplashStatus('Ready to launch!', 100);
+        console.error('[AutoUpdater Error]:', err ? err.message : err);
+        sendSplashStatus('Starting launcher...', 100);
         setTimeout(() => {
             finishSplashAndOpenMain();
-        }, 800);
+        }, 1000);
     });
 }
 
@@ -219,12 +233,12 @@ function createSplashWindow() {
 
     splashWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(splashHtml));
 
-    // ចាប់ផ្តើមពិនិត្យ Update ក្រោយពេល Splash Window បានបង្ហាញ
     splashWindow.webContents.on('did-finish-load', () => {
         if (app.isPackaged) {
-            autoUpdater.checkForUpdatesAndNotify().catch(() => {
-                sendSplashStatus('Checking resources...', 60);
-                setTimeout(finishSplashAndOpenMain, 1200);
+            autoUpdater.checkForUpdates().catch((err) => {
+                console.error('[AutoUpdater Check Error]:', err);
+                sendSplashStatus('Starting launcher...', 100);
+                setTimeout(finishSplashAndOpenMain, 1000);
             });
         } else {
             // Development Mode Simulation
@@ -233,7 +247,7 @@ function createSplashWindow() {
             setTimeout(() => {
                 sendSplashStatus('Ready to play!', 100);
                 setTimeout(finishSplashAndOpenMain, 600);
-            }, 1400);
+            }, 1200);
         }
     });
 }
