@@ -303,8 +303,9 @@
         .modal-content {
             background: rgba(11, 19, 41, 0.95); 
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px; 
-            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 30px rgba(26, 140, 187, 0.2);
+            border-radius: 28px; 
+            overflow: hidden;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 30px rgba(26, 140, 187, 0.25);
             transform: scale(0.95); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .modal-overlay.active .modal-content { transform: scale(1); }
@@ -317,6 +318,29 @@
         @keyframes progress-stripes-anim {
             from { background-position: 1rem 0; }
             to { background-position: 0 0; }
+        }
+
+        /* Custom Styled Sliders & Inputs */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #020617;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 9999px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #38bdf8;
+            box-shadow: 0 0 10px #38bdf8;
+            cursor: pointer;
+            border: 2px solid #0b1329;
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
         }
     </style>
 </head>
@@ -1985,6 +2009,7 @@
 
             if (isElectron && window.electronAPI.onMsLoginStatus) {
                 window.electronAPI.onMsLoginStatus((data) => {
+                    const isKm = currentLang === 'km';
                     if (data.status === 'success') {
                         const newAcc = data.account;
                         const exists = accounts.find(a => a.id === newAcc.id);
@@ -1993,12 +2018,31 @@
                         localStorage.setItem('longvek_active_account_id', activeAccountId);
                         saveAccounts(); currentUser = newAcc; 
                         renderAccountList(); updateUIForActiveAccount();
-                        if(window.showToast) showToast("ជោគជ័យ", "ចូលគណនី Microsoft បានជោគជ័យ!", "success");
+                        if(window.showToast) {
+                            showToast(
+                                isKm ? "ជោគជ័យ" : "Success", 
+                                isKm ? "ចូលគណនី Microsoft បានជោគជ័យ!" : "Microsoft account logged in successfully!", 
+                                "success"
+                            );
+                        }
                         closeAuthModal();
                     } else if (data.status === 'error') {
-                        if(window.showToast) showToast("បរាជ័យ", `មិនអាចចូលគណនីបានទេ: ${data.msg}`, "error");
+                        if(window.showToast) {
+                            showToast(
+                                isKm ? "បរាជ័យ" : "Error", 
+                                isKm ? `មិនអាចចូលគណនីបានទេ: ${data.msg}` : `Login failed: ${data.msg}`, 
+                                "error"
+                            );
+                        }
                     } else if (data.status === 'loading') {
-                        if(window.showToast) showToast("សូមរង់ចាំ...", data.msg, "info", "ms-login");
+                        if(window.showToast) {
+                            showToast(
+                                isKm ? "សូមរង់ចាំ..." : "Please wait...", 
+                                data.msg, 
+                                "info", 
+                                "ms-login"
+                            );
+                        }
                     }
                 });
             }
@@ -2225,7 +2269,7 @@
                 msView.classList.add('hidden'); msView.classList.remove('flex');
                 
                 freeBtn.className = freeActive;
-                msBtn.className = msInactive;
+                msBtn.className = freeInactive;
                 
                 const inputVal = document.getElementById('offline-username')?.value;
                 if (inputVal) handleOfflineInput(inputVal);
@@ -2314,9 +2358,10 @@
 
         window.loginMicrosoft = function() {
             if (isElectron && window.electronAPI.msLogin) {
-                window.electronAPI.msLogin();
+                window.electronAPI.msLogin(currentLang || 'en');
             } else {
-                if(window.showToast) showToast("Notice", "Microsoft Login requires the desktop application.", "info");
+                const isKm = currentLang === 'km';
+                if(window.showToast) showToast(isKm ? "ដំណឹង" : "Notice", isKm ? "ការចូលគណនី Microsoft ដំណើរការលើកម្មវិធី Desktop តែប៉ុណ្ណោះ។" : "Microsoft Login requires the desktop application.", "info");
             }
         };
 
@@ -2326,9 +2371,10 @@
             
             const username = input.value.trim();
             const role = roleInput ? roleInput.value : 'Offline Player';
+            const isKm = currentLang === 'km';
             
             if (!username) {
-                if(window.showToast) showToast("Error", "Please enter a character username.", "error");
+                if(window.showToast) showToast(isKm ? "កំហុស" : "Error", isKm ? "សូមវាយបញ្ចូលឈ្មោះតួអង្គ!" : "Please enter a character username.", "error");
                 return;
             }
             
@@ -2336,7 +2382,7 @@
             if (existing) {
                 existing.role = role;
                 switchAccount(existing.id);
-                if(window.showToast) showToast("Info", "Switched to existing character.", "info");
+                if(window.showToast) showToast(isKm ? "ដំណឹង" : "Info", isKm ? `បានប្តូរទៅកាន់តួអង្គ: ${username}` : `Switched to existing character: ${username}`, "info");
             } else {
                 const newAcc = {
                     id: 'offline_' + Date.now(),
@@ -2351,7 +2397,7 @@
                 currentUser = newAcc;
                 saveAccounts();
                 updateUIForActiveAccount();
-                if(window.showToast) showToast("Success", `Created character: ${username}`, "success");
+                if(window.showToast) showToast(isKm ? "ជោគជ័យ" : "Success", isKm ? `បានបង្កើតតួអង្គ: ${username}` : `Created character: ${username}`, "success");
             }
             
             input.value = '';
@@ -2633,24 +2679,49 @@
             });
         }
 
+        function getProfileFormattedName(prof) {
+            const loaderPrefix = (prof.loader && prof.loader !== 'vanilla') ? prof.loader.toUpperCase() + ' ' : '';
+            return `Profile ${loaderPrefix}${prof.version || '1.20.1'}`;
+        }
+
         window.quickSelectVersion = function(ver, loader = 'vanilla') {
-            document.getElementById('version-select').value = ver;
-            document.getElementById('selected-version-text').innerText = ver;
-            
-            const loaderTag = document.getElementById('selected-loader-tag');
-            if (loaderTag) {
-                loaderTag.innerText = loader.toUpperCase();
-                if (loader === 'fabric') loaderTag.className = "text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-cyan-400/20 text-cyan-300 border border-cyan-400/30";
-                else if (loader === 'forge') loaderTag.className = "text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30";
-                else if (loader === 'optifine') loaderTag.className = "text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-emerald-400/20 text-emerald-300 border border-emerald-400/30";
-                else loaderTag.className = "text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-sky-400/20 text-sky-300 border border-sky-400/30";
+            // ស្វែងរកមើលថាតើមាន Profile នៃ Version និង Loader នេះរួចហើយឬនៅ
+            let targetProf = gameProfiles.find(p => p.version === ver && (p.loader || 'vanilla') === loader);
+
+            if (targetProf) {
+                selectProfile(targetProf.id);
+            } else {
+                // ប្តូរឈ្មោះ Profile ចាស់ៗទាំងអស់ដែលធ្លាប់ជា "Default Profile" ទៅជា "Profile [Version]"
+                gameProfiles.forEach(p => {
+                    if (p.name === 'Default Profile' || p.name.startsWith('Default')) {
+                        p.name = getProfileFormattedName(p);
+                    }
+                });
+
+                // បង្កើត Profile ថ្មីដែលជា Default Profile
+                const newProf = {
+                    id: 'prof_' + Date.now(),
+                    name: 'Default Profile',
+                    version: ver,
+                    loader: loader,
+                    icon: loader === 'fabric' ? 'ph-sparkle' : (loader === 'forge' ? 'ph-hammer' : (loader === 'optifine' ? 'ph-rocket-launch' : 'ph-game-controller'))
+                };
+
+                gameProfiles.unshift(newProf);
+                activeProfileId = newProf.id;
+
+                localStorage.setItem('longvek_active_profile_id', activeProfileId);
+                localStorage.setItem('longvek_profiles', JSON.stringify(gameProfiles));
+
+                updateActiveProfileUI(newProf);
+                renderProfileList();
+                renderManageProfilesList();
+
+                toggleVersionDropdown();
+                if (window.showToast) {
+                    showToast("Version Selected", `Switched to ${ver} as Default Profile`, "success");
+                }
             }
-
-            const holoVer = document.getElementById('holo-version-text');
-            if (holoVer) holoVer.innerText = ver;
-
-            toggleVersionDropdown();
-            if (window.showToast) showToast("Version Selected", `Switched to ${ver}`, "info");
         };
 
         window.filterProfilesAndVersions = function(query) {
@@ -2771,8 +2842,6 @@
 
             filtered.forEach(prof => {
                 const isActive = prof.id === activeProfileId;
-                const isDefault = prof.id === 'default';
-                
                 const icon = prof.icon || 'ph-game-controller';
                 const loader = (prof.loader || 'vanilla').toUpperCase();
 
@@ -2793,11 +2862,9 @@
                             </div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
-                            ${!isDefault ? `
-                                <button onclick="deleteProfileFromDropdown('${prof.id}', event)" class="w-7 h-7 rounded-lg bg-surface-950/80 hover:bg-red-500/20 text-gray-400 hover:text-red-400 flex items-center justify-center border border-white/5 hover:border-red-500/30 transition-all opacity-0 group-hover:opacity-100" title="Delete Profile">
-                                    <i class="ph-bold ph-trash text-xs"></i>
-                                </button>
-                            ` : ''}
+                            <button onclick="deleteProfileFromDropdown('${prof.id}', event)" class="w-7 h-7 rounded-lg bg-surface-950/80 hover:bg-red-500/20 text-gray-400 hover:text-red-400 flex items-center justify-center border border-white/5 hover:border-red-500/30 transition-all opacity-0 group-hover:opacity-100" title="Delete Profile">
+                                <i class="ph-bold ph-trash text-xs"></i>
+                            </button>
                             <i class="ph ph-caret-right text-gray-500 group-hover:text-brand-300 group-hover:translate-x-0.5 transition-all text-sm"></i>
                         </div>
                     </div>
@@ -2808,9 +2875,23 @@
         window.selectProfile = function(id) {
             activeProfileId = id;
             localStorage.setItem('longvek_active_profile_id', id);
+            
+            // កំណត់ Profile ដែលបានជ្រើសរើសជា "Default Profile" ហើយប្តូរ Profile ចាស់ៗទៅជា "Profile [Version]"
+            gameProfiles.forEach(p => {
+                if (p.id === id) {
+                    p.name = "Default Profile";
+                } else {
+                    if (p.name === 'Default Profile' || p.name.startsWith('Default')) {
+                        p.name = getProfileFormattedName(p);
+                    }
+                }
+            });
+            localStorage.setItem('longvek_profiles', JSON.stringify(gameProfiles));
+
             const prof = gameProfiles.find(p => p.id === id) || gameProfiles[0];
             if (prof) updateActiveProfileUI(prof);
             renderProfileList();
+            renderManageProfilesList();
             toggleVersionDropdown();
         };
 
@@ -2827,7 +2908,7 @@
             if (nameEl) nameEl.innerText = prof.name || 'Default Profile';
             if (textEl) textEl.innerText = prof.version || '1.20.1';
             if (selVer) selVer.value = prof.version || '1.20.1';
-            if (selProf) selProf.value = prof.id || 'default';
+            if (selProf) selProf.value = prof.id;
             if (holoVer) holoVer.innerText = prof.version || '1.20.1';
             
             if (iconEl && prof.icon) {
@@ -2847,8 +2928,18 @@
         window.saveNewProfile = function() {
             const nameInput = document.getElementById('new-profile-name');
             const iconSelect = document.getElementById('new-profile-icon-select');
-            const name = nameInput?.value.trim() || `Profile ${gameProfiles.length + 1}`;
+            let name = nameInput?.value.trim();
             const icon = iconSelect?.value || 'ph-game-controller';
+
+            // ប្រសិនបើមិនបានវាយឈ្មោះទេ ដាក់ឈ្មោះ Default Profile ហើយប្តូរ Profile ចាស់ៗទៅជាឈ្មោះ Profile Version
+            if (!name) {
+                name = 'Default Profile';
+                gameProfiles.forEach(p => {
+                    if (p.name === 'Default Profile' || p.name.startsWith('Default')) {
+                        p.name = getProfileFormattedName(p);
+                    }
+                });
+            }
 
             const newProf = {
                 id: 'prof_' + Date.now(),
@@ -2877,21 +2968,30 @@
                 event.preventDefault();
                 event.stopPropagation();
             }
-            if (id === 'default') {
-                showToast("Notice", "Default Profile cannot be deleted.", "info");
-                return;
-            }
 
             const deletedProf = gameProfiles.find(p => p.id === id);
             gameProfiles = gameProfiles.filter(p => p.id !== id);
+
+            if (gameProfiles.length === 0) {
+                const fallbackProf = {
+                    id: 'prof_' + Date.now(),
+                    name: 'Default Profile',
+                    version: '1.20.1',
+                    loader: 'vanilla',
+                    icon: 'ph-game-controller'
+                };
+                gameProfiles = [fallbackProf];
+                activeProfileId = fallbackProf.id;
+            } else if (activeProfileId === id) {
+                activeProfileId = gameProfiles[0].id;
+                gameProfiles[0].name = 'Default Profile';
+            }
+
+            localStorage.setItem('longvek_active_profile_id', activeProfileId);
             localStorage.setItem('longvek_profiles', JSON.stringify(gameProfiles));
 
-            if (activeProfileId === id) {
-                activeProfileId = 'default';
-                localStorage.setItem('longvek_active_profile_id', 'default');
-                const def = gameProfiles.find(p => p.id === 'default') || gameProfiles[0];
-                if (def) updateActiveProfileUI(def);
-            }
+            const cur = gameProfiles.find(p => p.id === activeProfileId) || gameProfiles[0];
+            if (cur) updateActiveProfileUI(cur);
 
             renderProfileList();
             renderManageProfilesList();
@@ -2922,7 +3022,6 @@
             
             gameProfiles.forEach(prof => {
                 const isActive = prof.id === activeProfileId;
-                const isDefault = prof.id === 'default';
                 const icon = prof.icon || 'ph-game-controller';
                 
                 container.innerHTML += `
@@ -2940,10 +3039,9 @@
                             <button onclick="openProfileDir('${prof.id}')" class="px-3 py-1.5 rounded-xl bg-surface-950 hover:bg-brand-500 hover:text-white text-gray-400 text-xs font-bold transition-colors border border-white/5" title="Open Folder">
                                 <i class="ph-bold ph-folder-open"></i>
                             </button>
-                            ${!isDefault && !isActive ? `
                             <button onclick="deleteProfile('${prof.id}')" class="px-3 py-1.5 rounded-xl bg-surface-950 hover:bg-red-500 hover:text-white text-gray-400 text-xs font-bold transition-colors border border-white/5" title="Delete Profile">
                                 <i class="ph-bold ph-trash"></i>
-                            </button>` : `<div class="w-8"></div>`}
+                            </button>
                         </div>
                     </div>
                 `;
@@ -2951,32 +3049,33 @@
         };
 
         window.deleteProfile = function(id) {
-            if(id === 'default' || id === activeProfileId) return;
+            const deletedProf = gameProfiles.find(p => p.id === id);
             gameProfiles = gameProfiles.filter(p => p.id !== id);
+
+            if (gameProfiles.length === 0) {
+                const fallbackProf = {
+                    id: 'prof_' + Date.now(),
+                    name: 'Default Profile',
+                    version: '1.20.1',
+                    loader: 'vanilla',
+                    icon: 'ph-game-controller'
+                };
+                gameProfiles = [fallbackProf];
+                activeProfileId = fallbackProf.id;
+            } else if (activeProfileId === id) {
+                activeProfileId = gameProfiles[0].id;
+                gameProfiles[0].name = 'Default Profile';
+            }
+
+            localStorage.setItem('longvek_active_profile_id', activeProfileId);
             localStorage.setItem('longvek_profiles', JSON.stringify(gameProfiles));
+
+            const cur = gameProfiles.find(p => p.id === activeProfileId) || gameProfiles[0];
+            if (cur) updateActiveProfileUI(cur);
+
             renderManageProfilesList(); 
             renderProfileList();
-            showToast("Profile Deleted", "The profile has been removed from launcher.", "success");
-        };
-
-        window.openChangelogModal = function() {
-            const modal = document.getElementById('changelog-modal');
-            if (modal) modal.classList.add('active');
-        };
-
-        window.closeChangelogModal = function() {
-            const modal = document.getElementById('changelog-modal');
-            if (modal) modal.classList.remove('active');
-        };
-
-        const uiElementsToHide = ['social-icons', 'news-panel', 'quick-access-area', 'main-sidebar', 'playtime-badge', 'hologram-version-badge', 'player-welcome', 'skin-anim-toolbar'];
-
-        window.handlePlayBtnClick = function() {
-            if (isLaunching) {
-                cancelLaunch();
-            } else {
-                startPortalLaunch();
-            }
+            showToast("Profile Deleted", `Profile "${deletedProf?.name || id}" has been removed.`, "success");
         };
 
         window.cancelLaunch = function() {

@@ -6,7 +6,7 @@ const os = require('os');
 const axios = require('axios');
 const extract = require('extract-zip');
 const { Client, Authenticator } = require('minecraft-launcher-core');
-const { Auth } = require('msmc');
+const msmc = require('msmc');
 const DiscordRPC = require('discord-rpc');
 const { autoUpdater } = require('electron-updater');
 
@@ -179,14 +179,14 @@ function createSplashWindow() {
                 <img src="https://i.postimg.cc/yYwMV4MX/longveklogo.png" onerror="this.onerror=null; this.src='https://placehold.co/120x120/0B132B/2563EB?text=LMC';" class="w-16 h-16 object-contain animate-logo" />
                 <div class="text-center">
                     <h1 class="text-xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-blue-200 to-white bg-clip-text text-transparent">LONGVEKMC</h1>
-                    <p class="text-[10px] text-blue-300/80 font-bold uppercase tracking-widest">Next-Gen Client Launcher</p>
+                    <p class="text-[10px] text-blue-300/80 font-bold uppercase tracking-widest">Next-Gen Minecraft Launcher</p>
                 </div>
             </div>
 
             <!-- Bottom Progress & Status -->
             <div class="w-full space-y-2 z-10">
                 <div class="flex justify-between text-xs font-semibold px-1">
-                    <span id="statusTxt" class="text-blue-200 text-[11px] truncate max-w-[300px]">Starting client services...</span>
+                    <span id="statusTxt" class="text-blue-200 text-[11px] truncate max-w-[300px]">Starting launcher services...</span>
                     <span id="percentTxt" class="text-blue-400 font-mono text-[11px]">0%</span>
                 </div>
                 <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-blue-900/50">
@@ -454,44 +454,89 @@ ipcMain.handle('get-local-versions', async () => {
     }
 });
 
-ipcMain.on('ms-login', async (event) => {
+ipcMain.on('ms-login', async (event, lang = 'en') => {
+    const isKm = lang === 'km';
     try {
-        const authManager = new Auth('select_account');
-        event.reply('ms-login-status', { status: 'loading', msg: 'Opening Microsoft Login...' });
+        event.reply('ms-login-status', { 
+            status: 'loading', 
+            msg: isKm ? 'កំពុងបើកផ្ទាំងចូលគណនី Microsoft...' : 'Opening Microsoft Login...' 
+        });
 
-        const xboxManager = await authManager.launch('electron');
-        event.reply('ms-login-status', { status: 'loading', msg: 'Getting Minecraft Token...' });
+        const AuthClass = msmc.Auth || (msmc.default && msmc.default.Auth) || (typeof msmc === 'function' ? msmc : null);
+        let mclcAuthResult = null;
+        let playerName = 'Microsoft Player';
+        let playerId = Date.now().toString();
 
-        const token = await xboxManager.getMinecraft();
+        if (AuthClass && typeof AuthClass === 'function') {
+            const authManager = new AuthClass('select_account');
+            const xboxManager = await authManager.launch('electron');
+            event.reply('ms-login-status', { 
+                status: 'loading', 
+                msg: isKm ? 'កំពុងទាញយក Minecraft Token...' : 'Getting Minecraft Token...' 
+            });
+            const token = await xboxManager.getMinecraft();
+            
+            mclcAuthResult = typeof token.mclc === 'function' ? token.mclc() : (token.mclc || token);
+            playerName = mclcAuthResult.name || (token.profile && token.profile.name) || playerName;
+            playerId = mclcAuthResult.uuid || mclcAuthResult.id || playerId;
+        } else if (typeof msmc.fastLaunch === 'function') {
+            const result = await msmc.fastLaunch('electron', (update) => {
+                event.reply('ms-login-status', { 
+                    status: 'loading', 
+                    msg: update.message || (isKm ? 'កំពុងផ្ទៀងផ្ទាត់...' : 'Authenticating...') 
+                });
+            });
+            if (msmc.errorCheck && msmc.errorCheck(result)) {
+                throw new Error(result.reason || (isKm ? 'ការផ្ទៀងផ្ទាត់មិនជោគជ័យ' : 'Authentication failed'));
+            }
+            mclcAuthResult = typeof result.mclc === 'function' ? result.mclc() : (result.mclc || result);
+            playerName = mclcAuthResult.name || (result.profile && result.profile.name) || playerName;
+            playerId = mclcAuthResult.uuid || mclcAuthResult.id || playerId;
+        } else {
+            throw new Error(isKm ? 'MSMC library ដំណើរការមិនបានសម្រេច។' : 'MSMC library initialization failed.');
+        }
 
-        if (token && token.mclc) {
+        if (mclcAuthResult) {
             event.reply('ms-login-status', {
                 status: 'success',
                 account: {
-                    id: token.mclc.id || Date.now().toString(),
-                    name: token.mclc.name,
+                    id: playerId,
+                    name: playerName,
                     type: 'microsoft',
-                    mclcAuth: token.mclc
+                    mclcAuth: mclcAuthResult
                 }
             });
         } else {
-            throw new Error('Failed to get Minecraft token.');
+            throw new Error(isKm ? 'មិនអាចទាញយក Minecraft Token បានទេ។' : 'Failed to get Minecraft token.');
         }
     } catch (error) {
         console.error('MS Login Error:', error);
-        event.reply('ms-login-status', { status: 'error', msg: error.message });
+        event.reply('ms-login-status', { 
+            status: 'error', 
+            msg: error.message || (isKm ? 'ការចូលគណនីបានបរាជ័យ' : 'Login failed') 
+        });
     }
 });
 
 ipcMain.handle('login-microsoft', async () => {
     try {
-        const authManager = new Auth('select_account');
-        const xboxManager = await authManager.launch('electron');
-        const token = await xboxManager.getMinecraft();
-        return {
-            success: true,
-            profile: token.mclc()
-        };
+        const AuthClass = msmc.Auth || (msmc.default && msmc.default.Auth) || (typeof msmc === 'function' ? msmc : null);
+        if (AuthClass && typeof AuthClass === 'function') {
+            const authManager = new AuthClass('select_account');
+            const xboxManager = await authManager.launch('electron');
+            const token = await xboxManager.getMinecraft();
+            return {
+                success: true,
+                profile: typeof token.mclc === 'function' ? token.mclc() : (token.mclc || token)
+            };
+        } else if (typeof msmc.fastLaunch === 'function') {
+            const result = await msmc.fastLaunch('electron');
+            return {
+                success: true,
+                profile: typeof result.mclc === 'function' ? result.mclc() : (result.mclc || result)
+            };
+        }
+        return { success: false, error: 'MSMC not initialized' };
     } catch (error) {
         return { success: false, error: error.message };
     }

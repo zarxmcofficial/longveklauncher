@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     // --- Authentication (Microsoft & Offline) ---
-    msLogin: () => ipcRenderer.send('ms-login'),
+    msLogin: (lang = 'en') => ipcRenderer.send('ms-login', lang),
     loginMicrosoft: () => ipcRenderer.invoke('login-microsoft'),
     onMsLoginStatus: (callback) => {
         ipcRenderer.removeAllListeners('ms-login-status');
