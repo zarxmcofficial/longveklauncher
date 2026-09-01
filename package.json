@@ -1,12 +1,13 @@
 {
 "name": "longveklauncher",
 "productName": "LONGVEK LAUNCHER",
-"version": "1.0.4",
+"version": "1.0.5",
 "description": "កម្មវិធីបើកលេង Minecraft កម្ពុជា - LONGVEK LAUNCHER",
 "main": "main.js",
 "scripts": {
 "start": "electron .",
-"build": "electron-builder --win --x64"
+"build": "electron-builder --win --x64",
+"dist": "electron-builder"
 },
 "keywords": [
 "minecraft",
@@ -14,8 +15,8 @@
 "longvek",
 "cambodia"
 ],
-"author": "LONGVEK Network",
-"license": "MIT",
+"author": "LONGVEK Team",
+"license": "ISC",
 "dependencies": {
 "axios": "^1.6.8",
 "discord-rpc": "^4.0.9",
@@ -31,35 +32,31 @@
 "build": {
 "appId": "com.longvek.launcher",
 "productName": "LONGVEK LAUNCHER",
-"directories": {
-"output": "dist"
-},
-"files": [
-"main.js",
-"preload.js",
-"index.html",
-"package.json",
-"icon.ico"
-],
-"win": {
-"target": [
-"nsis"
-],
-"icon": "icon.ico"
-},
-"nsis": {
-"oneClick": true,
-"allowToChangeInstallationDirectory": false,
-"createDesktopShortcut": true,
-"createStartMenuShortcut": true,
-"shortcutName": "LONGVEK LAUNCHER"
-},
 "publish": [
 {
 "provider": "github",
 "owner": "zarxmcofficial",
 "repo": "longveklauncher"
 }
-]
+],
+"directories": {
+"output": "dist"
+},
+"win": {
+"target": "nsis",
+"icon": "LONGVEKLAUNCHER.ico"
+},
+"nsis": {
+"oneClick": true,
+"perMachine": false,
+"allowToChangeInstallationDirectory": false,
+"installerIcon": "LONGVEKLAUNCHER.ico",
+"uninstallerIcon": "LONGVEKLAUNCHER.ico",
+"installerHeaderIcon": "LONGVEKLAUNCHER.ico",
+"createDesktopShortcut": true,
+"createStartMenuShortcut": true,
+"shortcutName": "LONGVEK LAUNCHER",
+"artifactName": "LONGVEK LAUNCHER Setup ${version}.${ext}"
+}
 }
 }
