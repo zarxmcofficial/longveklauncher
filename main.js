@@ -270,24 +270,27 @@ function createWindow() {
         frame: false,
         transparent: true,
         backgroundColor: '#060D1A',
-        icon: path.join(__dirname, 'icon.ico'),
+        icon: path.join(__dirname, 'LONGVEKLAUNCHER.ico'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            // បិទ Cache ដើម្បីកុំឱ្យជាប់ទម្រង់ HTML ចាស់
             webSecurity: true,
             devTools: true
         }
     });
 
-    // បោសសម្អាត Cache ដើម្បីធានាថាទាញយក index.html ជំនាន់ថ្មី ១០០%
+    // បោសសម្អាត Cache ទាំងស្រុងដើម្បីធានាថាទាញយក index.html ថ្មី ១០០%
     if (mainWindow.webContents.session) {
         mainWindow.webContents.session.clearCache();
+        mainWindow.webContents.session.clearStorageData({
+            storages: ['appcache', 'cachestorage', 'serviceworkers', 'shadercache']
+        });
     }
 
-    // Load ឯកសារ index.html ដោយផ្ទាល់
-    mainWindow.loadFile('index.html');
+    // Load ឯកសារ index.html តាមរយៈ path.join(__dirname) ជាមួយ Cache Buster
+    const indexPath = path.join(__dirname, 'index.html');
+    mainWindow.loadFile(indexPath, { query: { v: app.getVersion() } });
 
     mainWindow.on('maximize', () => {
         if (mainWindow && !mainWindow.isDestroyed()) {
