@@ -1,7 +1,7 @@
 {
 "name": "zklizlauncher1.0",
 "productName": "LONGVEK LAUNCHER",
-"version": "1.0.6",
+"version": "1.0.7",
 "description": "កម្មវិធីបើកលេង Minecraft កម្ពុជា - LONGVEK LAUNCHER",
 "main": "main.js",
 "scripts": {
@@ -64,7 +64,7 @@
 "createDesktopShortcut": true,
 "createStartMenuShortcut": true,
 "shortcutName": "LONGVEK LAUNCHER",
-"artifactName": "LONGVEK LAUNCHER Setup ${version}.${ext}"
+"artifactName": "LONGVEK-LAUNCHER-Setup-${version}.${ext}"
 }
 }
 }

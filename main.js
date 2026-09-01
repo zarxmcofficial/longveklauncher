@@ -10,6 +10,22 @@ const msmc = require('msmc');
 const DiscordRPC = require('discord-rpc');
 const { autoUpdater } = require('electron-updater');
 
+// បិទ HTTP Cache របស់ Chromium ដើម្បីធានាថាទាញយក UI index.html ថ្មីជានិច្ច
+app.commandLine.appendSwitch('disable-http-cache');
+
+// ការពារកុំឱ្យបើក Launcher ជាន់គ្នាពីរ ដែលនាំឱ្យកើត Access is denied (0x5)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+}
+
 let mainWindow = null;
 let splashWindow = null;
 let isLaunchAborted = false;
@@ -158,7 +174,7 @@ function createSplashWindow() {
         center: true,
         alwaysOnTop: true,
         backgroundColor: '#00000000',
-        icon: path.join(__dirname, 'icon.ico'),
+        icon: path.join(__dirname, 'LONGVEKLAUNCHER.ico'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -166,7 +182,6 @@ function createSplashWindow() {
         }
     });
 
-    // បង្កើតទិដ្ឋភាព Splash Screen ស្រស់ស្អាតជាមួយ Sound Effect "Ding" និង Progress Bar
     const splashHtml = `
     <!DOCTYPE html>
     <html>
@@ -185,19 +200,16 @@ function createSplashWindow() {
     </head>
     <body class="bg-transparent flex items-center justify-center h-screen m-0 p-4">
         <div class="w-full h-full rounded-3xl bg-[#060D1A]/95 border border-blue-500/30 p-6 flex flex-col items-center justify-between shadow-2xl backdrop-blur-xl relative overflow-hidden">
-            <!-- Background Glow -->
             <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
 
-            <!-- Top Logo & Title -->
             <div class="flex flex-col items-center gap-2 pt-2 z-10">
-                <img src="https://i.postimg.cc/yYwMV4MX/longveklogo.png" onerror="this.onerror=null; this.src='https://placehold.co/120x120/0B132B/2563EB?text=LMC';" class="w-16 h-16 object-contain animate-logo" />
+                <img src="https://i.postimg.cc/CKpVxR17/longvek-launcher.png" onerror="this.onerror=null; this.src='https://placehold.co/120x120/0B132B/2563EB?text=LMC';" class="w-16 h-16 object-contain animate-logo" />
                 <div class="text-center">
                     <h1 class="text-xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-blue-200 to-white bg-clip-text text-transparent">LONGVEKMC</h1>
                     <p class="text-[10px] text-blue-300/80 font-bold uppercase tracking-widest">Next-Gen Minecraft Launcher</p>
                 </div>
             </div>
 
-            <!-- Bottom Progress & Status -->
             <div class="w-full space-y-2 z-10">
                 <div class="flex justify-between text-xs font-semibold px-1">
                     <span id="statusTxt" class="text-blue-200 text-[11px] truncate max-w-[300px]">Starting launcher services...</span>
@@ -210,7 +222,6 @@ function createSplashWindow() {
         </div>
 
         <script>
-            // ទទួលទិន្នន័យ Status ពី main.js
             window.addEventListener('DOMContentLoaded', () => {
                 if (window.electronAPI && window.electronAPI.onSplashUpdateStatus) {
                     window.electronAPI.onSplashUpdateStatus((data) => {
@@ -241,7 +252,6 @@ function createSplashWindow() {
                 setTimeout(finishSplashAndOpenMain, 1000);
             });
         } else {
-            // Development Mode Simulation
             sendSplashStatus('Development Environment Ready', 40);
             setTimeout(() => sendSplashStatus('Initializing Core Components...', 80), 600);
             setTimeout(() => {
@@ -280,17 +290,8 @@ function createWindow() {
         }
     });
 
-    // បោសសម្អាត Cache ទាំងស្រុងដើម្បីធានាថាទាញយក index.html ថ្មី ១០០%
-    if (mainWindow.webContents.session) {
-        mainWindow.webContents.session.clearCache();
-        mainWindow.webContents.session.clearStorageData({
-            storages: ['appcache', 'cachestorage', 'serviceworkers', 'shadercache']
-        });
-    }
-
-    // Load ឯកសារ index.html តាមរយៈ path.join(__dirname) ជាមួយ Cache Buster
     const indexPath = path.join(__dirname, 'index.html');
-    mainWindow.loadFile(indexPath, { query: { v: app.getVersion() } });
+    mainWindow.loadFile(indexPath);
 
     mainWindow.on('maximize', () => {
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -320,9 +321,6 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-    if (session.defaultSession) {
-        session.defaultSession.flushStorageData();
-    }
     if (process.platform !== 'darwin') app.quit();
 });
 
