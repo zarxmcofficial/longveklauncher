@@ -1,13 +1,12 @@
 {
-"name": "zklizlauncher1.0",
+"name": "longveklauncher",
 "productName": "LONGVEK LAUNCHER",
-"version": "1.0.3",
+"version": "1.0.4",
 "description": "កម្មវិធីបើកលេង Minecraft កម្ពុជា - LONGVEK LAUNCHER",
 "main": "main.js",
 "scripts": {
 "start": "electron .",
-"build": "electron-builder --win --x64",
-"dist": "electron-builder"
+"build": "electron-builder --win --x64"
 },
 "keywords": [
 "minecraft",
@@ -15,49 +14,52 @@
 "longvek",
 "cambodia"
 ],
-"author": "LONGVEK Team",
-"license": "ISC",
-"type": "commonjs",
+"author": "LONGVEK Network",
+"license": "MIT",
 "dependencies": {
-"axios": "^1.19.0",
-"discord-rpc": "^4.0.1",
-"electron-updater": "^6.8.9",
+"axios": "^1.6.8",
+"discord-rpc": "^4.0.9",
+"electron-updater": "^6.1.8",
 "extract-zip": "^2.0.1",
-"minecraft-launcher-core": "^3.18.2",
-"msmc": "^3.1.5"
+"minecraft-launcher-core": "^3.2.14",
+"msmc": "^4.0.1"
 },
 "devDependencies": {
-"electron": "^31.7.7",
+"electron": "^29.1.5",
 "electron-builder": "^24.13.3"
 },
 "build": {
 "appId": "com.longvek.launcher",
 "productName": "LONGVEK LAUNCHER",
+"directories": {
+"output": "dist"
+},
+"files": [
+"main.js",
+"preload.js",
+"index.html",
+"package.json",
+"icon.ico"
+],
+"win": {
+"target": [
+"nsis"
+],
+"icon": "icon.ico"
+},
+"nsis": {
+"oneClick": true,
+"allowToChangeInstallationDirectory": false,
+"createDesktopShortcut": true,
+"createStartMenuShortcut": true,
+"shortcutName": "LONGVEK LAUNCHER"
+},
 "publish": [
 {
 "provider": "github",
 "owner": "zarxmcofficial",
 "repo": "longveklauncher"
 }
-],
-"directories": {
-"output": "dist"
-},
-"win": {
-"target": "nsis",
-"icon": "LONGVEKLAUNCHER.ico"
-},
-"nsis": {
-"oneClick": false,
-"perMachine": false,
-"allowToChangeInstallationDirectory": true,
-"installerIcon": "LONGVEKLAUNCHER.ico",
-"uninstallerIcon": "LONGVEKLAUNCHER.ico",
-"installerHeaderIcon": "LONGVEKLAUNCHER.ico",
-"createDesktopShortcut": true,
-"createStartMenuShortcut": true,
-"shortcutName": "LONGVEK LAUNCHER",
-"artifactName": "LONGVEK LAUNCHER Setup ${version}.${ext}"
-}
+]
 }
 }

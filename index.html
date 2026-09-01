@@ -6,11 +6,11 @@
     <title>LONGVEK LAUNCHER</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Inter & Outfit -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <!-- Google Fonts: Inter, Outfit, & Kantumruy Pro -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Kantumruy+Pro:wght@400;600;700;800&family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <!-- Skinview3D Official UMD Bundle (Standalone with Three.js included) -->
+    <!-- Skinview3D Official UMD Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/skinview3d@3.4.1/bundles/skinview3d.bundle.js"></script>
     
     <script>
@@ -18,8 +18,8 @@
             theme: {
                 extend: {
                     fontFamily: { 
-                        sans: ['Inter', 'sans-serif'],
-                        display: ['Outfit', 'sans-serif']
+                        sans: ['Inter', 'Kantumruy Pro', 'sans-serif'],
+                        display: ['Outfit', 'Kantumruy Pro', 'sans-serif']
                     },
                     colors: {
                         brand: { 
@@ -55,16 +55,14 @@
             overflow: hidden; 
             user-select: none;
             transform: translateZ(0); 
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', 'Kantumruy Pro', sans-serif;
         }
         
-        /* Custom Ultra-thin Scrollbar */
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.2); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.4); }
 
-        /* Premium Glassmorphism */
         .glass-panel {
             background: rgba(11, 19, 41, 0.7);
             backdrop-filter: blur(16px);
@@ -86,7 +84,6 @@
             transform: translateY(-2px);
         }
 
-        /* Ambient Background Layers */
         .bg-layer {
             position: absolute; inset: 0; z-index: -2;
             background-size: cover; background-position: center; 
@@ -107,7 +104,6 @@
             transition: none !important;
         }
 
-        /* Side Navigation Floating Nav Button */
         .nav-btn {
             position: relative;
             width: 48px;
@@ -151,7 +147,6 @@
             box-shadow: 0 0 12px #38bdf8;
         }
 
-        /* Tooltip styling */
         .nav-tooltip {
             position: absolute;
             left: calc(100% + 14px);
@@ -179,7 +174,6 @@
             transform: translateY(-50%) scale(1);
         }
 
-        /* Play Button Aura */
         .btn-play-primary {
             background: linear-gradient(135deg, #1A8CBB 0%, #0C5070 100%);
             box-shadow: 0 4px 20px rgba(16, 106, 148, 0.5), inset 0 1px 0 rgba(255,255,255,0.3);
@@ -192,7 +186,6 @@
             box-shadow: 0 8px 30px rgba(26, 140, 187, 0.8), inset 0 1px 0 rgba(255,255,255,0.5);
         }
 
-        /* 3D Hologram Area */
         .hero-showcase {
             position: relative; width: 360px; height: 460px;
             display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0 auto;
@@ -203,14 +196,6 @@
             width: 100%; height: 100%; outline: none;
             filter: drop-shadow(0 20px 30px rgba(0,0,0,0.6));
             transition: filter 0.5s ease, transform 0.5s ease;
-        }
-        
-        .portal-active .hero-showcase {
-            transform: translateY(-20px);
-        }
-
-        .portal-active #skin-canvas {
-            filter: drop-shadow(0 0 40px rgba(56, 189, 248, 0.95)) brightness(1.25);
         }
 
         .portal-ring {
@@ -251,14 +236,6 @@
             100% { transform: translate(-50%, -50%) rotate(-360deg) scale(1); }
         }
 
-        @keyframes materialize {
-            0% { opacity: 0; transform: translateY(-40px) scale(0.7); filter: blur(12px) brightness(2); }
-            60% { opacity: 1; transform: translateY(8px) scale(1.03); filter: blur(0px) brightness(1.3); }
-            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0) brightness(1); }
-        }
-        .animate-materialize { animation: materialize 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-        /* Smooth Tab Transition Animations */
         @keyframes tabFadeSlideIn {
             0% { 
                 opacity: 0; 
@@ -320,7 +297,6 @@
             to { background-position: 0 0; }
         }
 
-        /* Custom Styled Sliders & Inputs */
         input[type=range] {
             -webkit-appearance: none;
             background: #020617;
@@ -377,7 +353,7 @@
     <!-- MAIN APP WRAPPER -->
     <div class="flex-1 flex overflow-hidden relative">
         
-        <!-- SIDEBAR NAVIGATION MENU (SLEEK CYBER-DOCK) -->
+        <!-- SIDEBAR NAVIGATION MENU -->
         <aside class="w-[84px] glass-panel border-r border-white/5 flex flex-col justify-between items-center z-30 py-5 transition-transform duration-500" id="main-sidebar">
             <div class="flex flex-col gap-6 items-center w-full relative">
                 
@@ -393,22 +369,18 @@
 
                 <!-- Navigation Icons Dock -->
                 <nav id="main-nav" class="flex flex-col gap-3.5 items-center w-full">
-                    <!-- Play Tab -->
                     <button onclick="switchTab('tab-play', this)" class="nav-btn active group">
                         <i class="ph-fill ph-game-controller text-2xl group-hover:scale-110 transition-transform"></i>
                         <span class="nav-tooltip" id="tt-play">Play</span>
                     </button>
-                    <!-- Wardrobe Tab -->
                     <button onclick="switchTab('tab-wardrobe', this)" class="nav-btn group">
                         <i class="ph-fill ph-t-shirt text-2xl group-hover:scale-110 transition-transform"></i>
                         <span class="nav-tooltip" id="tt-wardrobe">Wardrobe</span>
                     </button>
-                    <!-- Servers Tab -->
                     <button onclick="switchTab('tab-servers', this)" class="nav-btn group">
                         <i class="ph-fill ph-hard-drives text-2xl group-hover:scale-110 transition-transform"></i>
                         <span class="nav-tooltip" id="tt-servers">Servers</span>
                     </button>
-                    <!-- Mods Tab -->
                     <button onclick="switchTab('tab-mods', this)" class="nav-btn group">
                         <i class="ph-fill ph-package text-2xl group-hover:scale-110 transition-transform"></i>
                         <span class="nav-tooltip" id="tt-mods">Mods & Packs</span>
@@ -416,7 +388,7 @@
                 </nav>
             </div>
 
-            <!-- Settings Icon (Bottom) -->
+            <!-- Settings Icon -->
             <div class="flex flex-col gap-2 items-center w-full">
                 <button onclick="openSettings()" class="nav-btn group" title="Settings">
                     <i class="ph-fill ph-gear text-2xl group-hover:rotate-45 transition-transform"></i>
@@ -449,7 +421,7 @@
             <!-- 1. PLAY TAB (HOMEPAGE) -->
             <div id="tab-play" class="tab-content active h-full flex flex-col overflow-hidden relative">
                 
-                <!-- Social Community Icons (Top Right) -->
+                <!-- Social Community Icons -->
                 <div class="absolute top-6 right-10 flex gap-2.5 z-30 transition-opacity duration-500" id="social-icons">
                     <button class="w-9 h-9 rounded-xl glass-card flex items-center justify-center text-gray-400 hover:text-[#FF0000] hover:border-[#FF0000]/40 transition-all duration-300" onclick="window.open('https://youtube.com', '_blank')"><i class="ph-fill ph-youtube-logo text-lg"></i></button>
                     <button class="w-9 h-9 rounded-xl glass-card flex items-center justify-center text-gray-400 hover:text-white hover:border-white/40 transition-all duration-300" onclick="window.open('https://tiktok.com', '_blank')"><i class="ph-fill ph-tiktok-logo text-lg"></i></button>
@@ -466,7 +438,7 @@
                         <span class="text-[9px] font-black px-2 py-0.5 rounded-md bg-brand-500/25 text-brand-300 border border-brand-400/40">v2.5 PRO</span>
                     </div>
 
-                    <!-- Changelog Teaser Item (Clickable) -->
+                    <!-- Changelog Teaser Item -->
                     <div class="flex flex-col gap-2.5 cursor-pointer group" onclick="openChangelogModal()">
                         <div class="flex items-start gap-3">
                             <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600/40 to-sky-400/20 flex items-center justify-center text-brand-300 border border-brand-500/40 shrink-0 group-hover:scale-105 group-hover:shadow-[0_0_15px_rgba(56,189,248,0.4)] transition-all">
@@ -481,7 +453,6 @@
                             </div>
                         </div>
 
-                        <!-- Mini Badges Strip -->
                         <div class="flex items-center gap-1.5 pt-1 border-t border-white/5">
                             <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-surface-950 text-emerald-400 border border-emerald-500/30" id="badge-3d">✨ 3D Controls</span>
                             <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-surface-950 text-cyan-300 border border-cyan-400/30" id="badge-prof">⚡ Profiles</span>
@@ -498,11 +469,10 @@
                     </div>
 
                     <div class="hero-showcase z-10 relative" id="hologram-container">
-                        <!-- Portal Ambient Rings -->
                         <div class="portal-ring portal-ring-1"></div>
                         <div class="portal-ring portal-ring-2"></div>
 
-                        <!-- Empty State (Hidden when user active) -->
+                        <!-- Empty State -->
                         <div id="hologram-empty-state" onclick="openAuthModal()" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center z-20 cursor-pointer group p-6 rounded-3xl bg-surface-900/60 backdrop-blur-md border border-white/10 hover:border-brand-400/50 hover:bg-brand-500/10 transition-all duration-300 shadow-2xl">
                             <div class="w-16 h-16 rounded-2xl bg-brand-500/15 border border-brand-400/30 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(56,189,248,0.5)] transition-all">
                                 <i class="ph-fill ph-user-circle-plus text-4xl text-brand-300 opacity-90 animate-pulse"></i>
@@ -511,7 +481,7 @@
                             <span class="text-[10px] text-gray-400 mt-1 font-medium group-hover:text-gray-300 text-center" id="lbl-no-account-desc">Click here or Avatar to Login / Add Account</span>
                         </div>
                         
-                        <!-- 3D Skin Canvas Element -->
+                        <!-- 3D Skin Canvas -->
                         <canvas id="skin-canvas" class="w-full h-full outline-none block cursor-grab active:cursor-grabbing hidden opacity-0 transition-opacity duration-500"></canvas>
 
                         <!-- Floating Badges -->
@@ -529,7 +499,7 @@
                         </div>
                     </div>
 
-                    <!-- 3D Character Pose & Animation Control Bar -->
+                    <!-- 3D Character Pose Control Bar -->
                     <div id="skin-anim-toolbar" class="z-20 mt-1 flex items-center gap-1.5 p-1.5 bg-surface-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-0 pointer-events-none transition-all duration-500 scale-95">
                         <button onclick="setPlayerAnimation('idle', this)" id="anim-btn-idle" class="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all bg-brand-500/20 text-brand-300 border border-brand-400/40 shadow-sm" title="Idle">
                             <i class="ph-fill ph-user text-xs"></i> <span id="lbl-anim-idle">Idle</span>
@@ -595,17 +565,14 @@
                     </div>
                     
                     <div class="flex gap-8 items-stretch justify-center w-full flex-1">
-                        
                         <!-- Left Controls -->
                         <div class="flex flex-col gap-4 w-[340px]">
-                            <!-- 3D Preview Box -->
                             <div class="glass-panel border border-brand-500/30 rounded-3xl shadow-[0_0_30px_rgba(26,140,187,0.2)] flex flex-col items-center justify-center relative overflow-hidden group h-80">
                                 <div class="absolute inset-0 bg-gradient-to-b from-brand-500/10 to-transparent opacity-50 pointer-events-none"></div>
                                 <canvas id="wardrobe-canvas" class="w-full h-full outline-none relative z-10 cursor-move"></canvas>
                                 <div class="absolute bottom-6 w-32 h-6 bg-black/50 rounded-[100%] blur-md pointer-events-none z-0"></div>
                             </div>
                             
-                            <!-- Input Box -->
                             <div class="glass-panel p-5 rounded-2xl flex flex-col gap-3.5">
                                 <div>
                                     <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block" id="lbl-upload-skin">Upload Skin File (.PNG)</label>
@@ -639,7 +606,6 @@
                             
                             <div id="skin-history-grid" class="grid grid-cols-3 gap-3 overflow-y-auto pr-2 content-start flex-1"></div>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -738,10 +704,9 @@
                             <i class="ph ph-caret-up text-gray-400 group-hover:text-white transition-transform duration-300 relative z-10" id="version-dropdown-icon"></i>
                         </button>
                         
-                        <!-- Advanced Version & Profile Dropdown Popup Menu -->
+                        <!-- Version Dropdown Menu -->
                         <div id="version-dropdown-menu" class="absolute bottom-[calc(100%+14px)] left-0 w-[380px] bg-surface-900/98 backdrop-blur-2xl border border-white/15 rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.85)] opacity-0 pointer-events-none transform translate-y-3 transition-all duration-300 z-50 overflow-hidden flex flex-col">
                             
-                            <!-- Dropdown Header -->
                             <div class="p-3.5 border-b border-white/10 bg-surface-950/60 flex flex-col gap-2.5">
                                 <div class="flex justify-between items-center">
                                     <div class="flex items-center gap-2">
@@ -760,14 +725,12 @@
                                     </div>
                                 </div>
 
-                                <!-- Search Box Inside Dropdown -->
                                 <div class="relative">
                                     <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
                                     <input type="text" id="profile-search-input" oninput="filterProfilesAndVersions(this.value)" placeholder="Search profiles or versions..." class="w-full bg-surface-950 border border-white/10 rounded-xl py-1.5 pl-8 pr-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-400 transition-colors">
                                 </div>
                             </div>
 
-                            <!-- Dropdown Tabs (Profiles vs All MC Versions) -->
                             <div class="flex border-b border-white/10 bg-surface-950/30 px-2 pt-1.5 gap-1">
                                 <button onclick="switchDropdownTab('profiles')" id="tab-btn-dropdown-profiles" class="flex-1 py-2 text-[11px] font-black uppercase tracking-wider text-brand-300 border-b-2 border-brand-400 bg-brand-500/10 rounded-t-xl transition-all flex items-center justify-center gap-1.5">
                                     <i class="ph-fill ph-hard-drives text-xs"></i> My Profiles
@@ -777,14 +740,11 @@
                                 </button>
                             </div>
 
-                            <!-- Profiles Tab Content -->
                             <div id="dropdown-profiles-view" class="max-h-64 overflow-y-auto p-2 flex flex-col gap-1.5">
                                 <div class="max-h-60 overflow-y-auto pr-1 flex flex-col gap-1.5" id="profiles-list-container"></div>
                             </div>
 
-                            <!-- Quick Versions Tab Content -->
                             <div id="dropdown-versions-view" class="max-h-64 overflow-y-auto p-2 flex flex-col gap-1.5 hidden">
-                                <!-- Category Filters for Versions -->
                                 <div class="flex gap-1 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
                                     <button onclick="filterVersionCategory('all', this)" class="ver-cat-pill active text-[9px] font-bold px-2 py-1 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-400/40 shrink-0">All</button>
                                     <button onclick="filterVersionCategory('release', this)" class="ver-cat-pill text-[9px] font-bold px-2 py-1 rounded-lg bg-surface-950 text-gray-400 hover:text-white border border-white/5 shrink-0">Releases</button>
@@ -827,13 +787,12 @@
         </main>
     </div>
 
-    <!-- Toast Notification Container -->
+    <!-- Toast Container -->
     <div id="toast-container" class="fixed top-14 right-6 z-[100] flex flex-col gap-2.5 pointer-events-none"></div>
 
     <!-- SETTINGS MODAL -->
     <div id="settings-modal" class="modal-overlay">
         <div class="modal-content w-[680px] flex flex-col relative overflow-hidden rounded-3xl" onclick="event.stopPropagation()">
-            <!-- Modal Header -->
             <div class="flex justify-between items-center p-5 border-b border-white/10 bg-surface-950/60">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-2xl bg-brand-500/20 text-brand-300 flex items-center justify-center border border-brand-400/30">
@@ -846,7 +805,6 @@
                 </button>
             </div>
             
-            <!-- Capsule Tab Switcher -->
             <div class="p-3 bg-surface-950/40 border-b border-white/5">
                 <div class="grid grid-cols-2 gap-2 p-1 bg-surface-950 rounded-2xl border border-white/10">
                     <button onclick="switchSettingTab('system')" id="btn-tab-system" class="py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider text-brand-300 bg-brand-500/20 border border-brand-400/40 shadow-sm transition-all flex items-center justify-center gap-2">
@@ -860,11 +818,8 @@
                 </div>
             </div>
 
-            <!-- Modal Body Content -->
             <div class="p-6 overflow-y-auto max-h-[58vh]">
                 <div id="system-settings" class="space-y-5">
-                    
-                    <!-- 1-Click FPS Booster Button -->
                     <div class="bg-gradient-to-r from-brand-600/30 via-surface-900 to-surface-900 border border-brand-400/40 p-4 rounded-2xl flex items-center justify-between group relative overflow-hidden shadow-lg">
                         <div class="relative z-10">
                             <h4 class="text-xs font-black text-white flex items-center gap-2 uppercase tracking-wider">
@@ -877,7 +832,6 @@
                         </button>
                     </div>
 
-                    <!-- RAM Slider -->
                     <div class="glass-card p-4 rounded-2xl">
                         <div class="flex justify-between items-end mb-2.5">
                             <label class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2" id="setting-ram-title">
@@ -889,7 +843,6 @@
                         <div class="flex justify-between text-[10px] text-gray-500 mt-2 font-bold px-0.5"><span>2 GB</span><span>8 GB</span><span>16 GB</span></div>
                     </div>
                     
-                    <!-- Language Selection -->
                     <div class="glass-card p-4 rounded-2xl flex items-center justify-between">
                         <div>
                             <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2" id="setting-lang-title">
@@ -906,7 +859,6 @@
                         </div>
                     </div>
 
-                    <!-- JVM Arguments -->
                     <div class="glass-card p-4 rounded-2xl">
                         <label class="text-xs font-bold text-white mb-1.5 block flex items-center gap-2">
                             <i class="ph-fill ph-terminal-window text-brand-300"></i> <span id="setting-jvm-title">Advanced JVM Arguments</span>
@@ -917,7 +869,6 @@
                 </div>
 
                 <div id="appearance-settings" class="space-y-5 hidden">
-                    <!-- Reduce Motion -->
                     <div class="glass-card p-4 rounded-2xl flex items-center justify-between">
                         <div>
                             <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2" id="setting-motion-title">
@@ -931,12 +882,11 @@
                         </label>
                     </div>
 
-                    <!-- Launcher Background Selector -->
                     <div>
                         <label class="text-xs font-bold text-white mb-3 block uppercase tracking-wider flex items-center gap-2" id="setting-bg-title">
                             <i class="ph-fill ph-image text-brand-300"></i> Launcher Background
                         </label>
-                        <div class="grid grid-cols-2 gap-3.5">
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3.5">
                             <div class="bg-card cursor-pointer group" onclick="setBackground('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTKU8GwCkURZMNwb0zHKw1qH3LjkLI5GEJ0ywQiKx2VwMCyRurg_8XKQag&s=10', this)">
                                 <div class="h-28 rounded-2xl overflow-hidden border-2 border-transparent transition-all group-hover:border-brand-400 relative shadow-md">
                                     <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTKU8GwCkURZMNwb0zHKw1qH3LjkLI5GEJ0ywQiKx2VwMCyRurg_8XKQag&s=10" class="w-full h-full object-cover">
@@ -965,12 +915,18 @@
                                 </div>
                                 <p class="text-xs font-semibold text-center mt-2 text-gray-400 group-hover:text-white">Epic Mods World</p>
                             </div>
+                            <div class="bg-card cursor-pointer group" onclick="setBackground('https://media.craiyon.com/2025-07-17/ZfDmZlNcQ3K9veEVHjgk3A.webp', this)">
+                                <div class="h-28 rounded-2xl overflow-hidden border-2 border-transparent transition-all group-hover:border-brand-400 relative shadow-md">
+                                    <img src="https://media.craiyon.com/2025-07-17/ZfDmZlNcQ3K9veEVHjgk3A.webp" class="w-full h-full object-cover" onerror="this.src='https://assets.badlion.net/blog/minecraft-backgrounds/minecraft-mods-back.webp'">
+                                    <div class="check-icon absolute top-2 right-2 bg-brand-500 w-6 h-6 rounded-full flex items-center justify-center text-white opacity-0 transition-opacity"><i class="ph-bold ph-check text-xs"></i></div>
+                                </div>
+                                <p class="text-xs font-semibold text-center mt-2 text-gray-400 group-hover:text-white">Fantasy Kingdom</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Modal Footer -->
             <div class="p-4 border-t border-white/10 bg-surface-950/60 flex justify-end">
                 <button onclick="closeSettings()" class="bg-brand-500 hover:bg-brand-400 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95" id="btn-done">Done</button>
             </div>
@@ -981,11 +937,9 @@
     <div id="auth-modal" class="modal-overlay">
         <div class="modal-content w-[500px] p-0 flex flex-col relative overflow-hidden bg-surface-900/95 backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.85)] rounded-3xl" onclick="event.stopPropagation()">
             
-            <!-- Ambient Glow Top Accents -->
             <div class="absolute -top-24 -left-20 w-48 h-48 bg-brand-400/20 rounded-full blur-3xl pointer-events-none"></div>
             <div class="absolute -top-24 -right-20 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
 
-            <!-- Modal Header -->
             <div class="relative p-5 border-b border-white/10 flex justify-between items-center z-10 bg-surface-950/60">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 via-sky-400 to-brand-400 flex items-center justify-center text-slate-950 shadow-[0_0_15px_rgba(56,189,248,0.4)]">
@@ -1001,11 +955,9 @@
                 </button>
             </div>
 
-            <!-- Capsule Tab Switcher -->
             <div class="p-3 bg-surface-950/40 border-b border-white/5">
                 <div class="grid grid-cols-2 gap-2 p-1 bg-surface-950 rounded-2xl border border-white/10">
                     <button onclick="switchLoginTab('microsoft')" id="btn-login-microsoft" class="py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/40 shadow-sm transition-all flex items-center justify-center gap-2">
-                        <!-- Official 4-Color Microsoft Logo -->
                         <svg class="w-4 h-4 shrink-0" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
                             <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
@@ -1021,10 +973,8 @@
                 </div>
             </div>
 
-            <!-- 1. MICROSOFT VIEW -->
+            <!-- MICROSOFT VIEW -->
             <div id="login-view-microsoft" class="flex flex-col p-6 z-10 relative gap-4">
-                
-                <!-- VIP Feature Card -->
                 <div class="glass-card p-4 rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-surface-900/80 to-surface-900 flex flex-col gap-3 relative overflow-hidden">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
@@ -1038,7 +988,6 @@
                         Log in with your official Microsoft account to join premium servers (Hypixel, 2B2T), sync skins across all devices, and show official capes.
                     </p>
 
-                    <!-- Feature check pills -->
                     <div class="grid grid-cols-2 gap-2 pt-1">
                         <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-hypixel">
                             <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Hypixel Supported
@@ -1055,12 +1004,10 @@
                     </div>
                 </div>
 
-                <!-- Microsoft Sign In Action Button with Official Colors -->
                 <button onclick="loginMicrosoft()" class="w-full relative group overflow-hidden rounded-2xl p-[1px] bg-gradient-to-r from-emerald-500 via-sky-400 to-emerald-400 shadow-[0_4px_25px_rgba(16,185,129,0.35)] hover:shadow-[0_8px_35px_rgba(16,185,129,0.6)] transition-all duration-300 active:scale-[0.98]">
                     <div class="w-full bg-surface-950 group-hover:bg-emerald-950/40 rounded-[15px] px-5 py-4 flex items-center justify-between transition-colors">
                         <div class="flex items-center gap-3.5">
                             <div class="w-11 h-11 rounded-xl bg-surface-900 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform">
-                                <!-- Colored Microsoft Grid -->
                                 <svg class="w-6 h-6" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
                                     <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
@@ -1079,16 +1026,13 @@
                     </div>
                 </button>
 
-                <!-- Official Mojang / Microsoft Legal Disclaimer -->
                 <p class="text-[9px] text-gray-500 text-center leading-relaxed px-2 font-medium" id="lbl-mojang-disclaimer">
                     Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
                 </p>
             </div>
 
-            <!-- 2. FREE / OFFLINE VIEW -->
+            <!-- FREE VIEW -->
             <div id="login-view-free" class="hidden flex-col p-6 z-10 relative gap-4">
-                
-                <!-- Live Avatar Preview Strip -->
                 <div class="glass-card p-3.5 rounded-2xl flex items-center gap-3.5 border border-white/10">
                     <div class="w-12 h-12 rounded-xl bg-surface-950 border border-white/10 overflow-hidden flex items-center justify-center relative shrink-0 shadow-inner">
                         <img id="offline-preview-avatar" src="https://mc-heads.net/avatar/MHF_Question/64" alt="Preview" class="w-full h-full object-cover object-top">
@@ -1102,7 +1046,6 @@
                     </div>
                 </div>
 
-                <!-- Username Input Field -->
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block flex items-center justify-between">
                         <span id="lbl-username-field">Character Username</span>
@@ -1116,7 +1059,6 @@
                     </div>
                 </div>
 
-                <!-- Playstyle Select -->
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block" id="lbl-playstyle-field">Player Role / Playstyle</label>
                     <div class="relative group">
@@ -1133,7 +1075,6 @@
                     </div>
                 </div>
 
-                <!-- Action Button -->
                 <button onclick="loginOffline()" class="w-full bg-gradient-to-r from-brand-500 to-sky-400 hover:from-brand-400 hover:to-sky-300 text-slate-950 rounded-2xl py-3.5 text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(56,189,248,0.4)] active:scale-[0.98] flex items-center justify-center gap-2 mt-1">
                     <span id="btn-create-connect">Create & Connect</span>
                     <i class="ph-bold ph-arrow-right text-sm"></i>
@@ -1142,7 +1083,7 @@
         </div>
     </div>
 
-    <!-- CREATE PROFILE MODAL (EXPANDED PRO VERSION EXPLORER) -->
+    <!-- CREATE PROFILE MODAL -->
     <div id="create-profile-modal" class="modal-overlay">
         <div class="modal-content w-[620px] p-0 flex flex-col overflow-hidden bg-surface-900/98 backdrop-blur-2xl border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.9)] rounded-3xl" onclick="event.stopPropagation()">
             
@@ -1162,8 +1103,6 @@
             </div>
 
             <div class="p-6 overflow-y-auto max-h-[72vh] flex flex-col gap-5">
-                
-                <!-- Profile Name & Icon Picker -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="md:col-span-2">
                         <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Profile Name</label>
@@ -1187,7 +1126,6 @@
                     </div>
                 </div>
 
-                <!-- Mod Loader Selector Cards -->
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Select Game Engine / Loader</label>
                     <div class="grid grid-cols-4 gap-2.5">
@@ -1214,7 +1152,6 @@
                     </div>
                 </div>
 
-                <!-- Version Library Selection with Search -->
                 <div>
                     <div class="flex justify-between items-end mb-2">
                         <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Choose Minecraft Version</label>
@@ -1258,11 +1195,10 @@
         </div>
     </div>
 
-    <!-- CHANGELOG & UPDATES MODAL -->
+    <!-- CHANGELOG MODAL -->
     <div id="changelog-modal" class="modal-overlay">
         <div class="modal-content w-[640px] p-0 flex flex-col overflow-hidden bg-surface-900/98 backdrop-blur-2xl border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.9)] rounded-3xl" onclick="event.stopPropagation()">
             
-            <!-- Modal Header -->
             <div class="p-5 border-b border-white/10 flex justify-between items-center bg-surface-950/60">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-sky-400 flex items-center justify-center text-slate-950 shadow-[0_0_15px_rgba(56,189,248,0.4)]">
@@ -1281,10 +1217,7 @@
                 </button>
             </div>
 
-            <!-- Modal Content - Feature Cards -->
             <div class="p-6 overflow-y-auto max-h-[68vh] flex flex-col gap-4">
-                
-                <!-- Feature 1: 3D Hologram Pose Controller -->
                 <div class="glass-card p-4 rounded-2xl border border-sky-400/30 bg-gradient-to-r from-sky-950/30 via-surface-900/80 to-surface-900 flex items-start gap-3.5">
                     <div class="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-300 border border-sky-400/40 shrink-0">
                         <i class="ph-fill ph-user-focus text-xl"></i>
@@ -1300,7 +1233,6 @@
                     </div>
                 </div>
 
-                <!-- Feature 2: Complete Minecraft Versions & Profiles Engine -->
                 <div class="glass-card p-4 rounded-2xl border border-brand-400/30 bg-gradient-to-r from-brand-950/30 via-surface-900/80 to-surface-900 flex items-start gap-3.5">
                     <div class="w-10 h-10 rounded-xl bg-brand-500/20 flex items-center justify-center text-brand-300 border border-brand-400/40 shrink-0">
                         <i class="ph-fill ph-stack text-xl"></i>
@@ -1316,7 +1248,6 @@
                     </div>
                 </div>
 
-                <!-- Feature 3: Official 4-Color Microsoft Auth & Live Avatar Preview -->
                 <div class="glass-card p-4 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-surface-900/80 to-surface-900 flex items-start gap-3.5">
                     <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/40 shrink-0">
                         <i class="ph-fill ph-shield-check text-xl"></i>
@@ -1332,7 +1263,6 @@
                     </div>
                 </div>
 
-                <!-- Feature 4: Cyber-Dock Navigation & Fluid Micro-transitions -->
                 <div class="glass-card p-4 rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/30 via-surface-900/80 to-surface-900 flex items-start gap-3.5">
                     <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-300 border border-purple-500/40 shrink-0">
                         <i class="ph-fill ph-paint-brush-broad text-xl"></i>
@@ -1349,7 +1279,6 @@
                 </div>
             </div>
 
-            <!-- Modal Footer -->
             <div class="p-4 border-t border-white/10 bg-surface-950/60 flex items-center justify-between">
                 <span class="text-[10px] text-gray-400 font-medium" id="lbl-changelog-footer">LONGVEK Network • Cambodia Official Client</span>
                 <button onclick="closeChangelogModal()" class="px-6 py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-white font-black uppercase tracking-wider text-xs transition-colors shadow-md" id="btn-changelog-ok">
@@ -1361,7 +1290,7 @@
 
     <!-- MAIN JAVASCRIPT LOGIC -->
     <script>
-        const isElectron = typeof window !== 'undefined' && window.electronAPI;
+        const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
         
         // --- State Management ---
         let accounts = JSON.parse(localStorage.getItem('longvek_accounts') || '[]');
@@ -1378,9 +1307,10 @@
         let savedJvmArgs = localStorage.getItem('longvek_jvm_args') || '';
         let skinHistory = JSON.parse(localStorage.getItem('longvek_skin_history') || '[]');
 
-        // Comprehensive Minecraft Versions Catalog
+        const uiElementsToHide = ['social-icons', 'news-panel', 'quick-access-area'];
+
+        // Minecraft Versions Catalog
         const MINECRAFT_VERSIONS_LIBRARY = [
-            // Modern Releases
             { version: "1.21.4", type: "release", category: "release", label: "Release 1.21.4 (Latest)", tag: "LATEST" },
             { version: "1.21.3", type: "release", category: "release", label: "Release 1.21.3", tag: "STABLE" },
             { version: "1.21.1", type: "release", category: "release", label: "Release 1.21.1", tag: "POPULAR" },
@@ -1400,14 +1330,12 @@
             { version: "1.8.9", type: "release", category: "release", label: "Release 1.8.9", tag: "PVP LEGEND" },
             { version: "1.7.10", type: "release", category: "release", label: "Release 1.7.10", tag: "LEGACY" },
 
-            // Fabric Popular Versions
             { version: "Fabric 1.21.1", type: "fabric", category: "fabric", label: "Fabric 1.21.1", tag: "FAST MODS" },
             { version: "Fabric 1.20.4", type: "fabric", category: "fabric", label: "Fabric 1.20.4", tag: "STABLE" },
             { version: "Fabric 1.20.1", type: "fabric", category: "fabric", label: "Fabric 1.20.1", tag: "BEST PERFORMANCE" },
             { version: "Fabric 1.19.4", type: "fabric", category: "fabric", label: "Fabric 1.19.4", tag: "MODS" },
             { version: "Fabric 1.16.5", type: "fabric", category: "fabric", label: "Fabric 1.16.5", tag: "FABRIC NETHER" },
 
-            // Forge Popular Versions
             { version: "Forge 1.21.1", type: "forge", category: "forge", label: "Forge 1.21.1", tag: "NEW FORGE" },
             { version: "Forge 1.20.1", type: "forge", category: "forge", label: "Forge 1.20.1", tag: "OPTIMIZED" },
             { version: "Forge 1.19.4", type: "forge", category: "forge", label: "Forge 1.19.4", tag: "MODS" },
@@ -1415,7 +1343,6 @@
             { version: "Forge 1.12.2", type: "forge", category: "forge", label: "Forge 1.12.2", tag: "MEGA PACKS" },
             { version: "Forge 1.8.9", type: "forge", category: "forge", label: "Forge 1.8.9", tag: "PVP MODS" },
 
-            // OptiFine Versions
             { version: "OptiFine 1.20.1", type: "optifine", category: "optifine", label: "OptiFine HD 1.20.1", tag: "SHADERS" },
             { version: "OptiFine 1.16.5", type: "optifine", category: "optifine", label: "OptiFine HD 1.16.5", tag: "FPS BOOST" },
             { version: "OptiFine 1.8.9", type: "optifine", category: "optifine", label: "OptiFine HD 1.8.9", tag: "ULTRA PVP" }
@@ -1426,7 +1353,7 @@
         let activeDropdownTab = 'profiles';
         let activeQuickVerCategory = 'all';
 
-        // --- 3D Skin Viewer Instances ---
+        // 3D Skin Viewers
         let mainSkinViewer = null;
         let wardrobeSkinViewer = null;
         let smallSkinViewers = [];
@@ -1456,7 +1383,6 @@
                         mainSkinViewer.animation = new skinview3d.WalkingAnimation();
                         mainSkinViewer.animation.speed = 0.3;
                     }
-                    
                     mainSkinViewer.autoRotate = false;
                 } catch (e) {
                     console.error("Main SkinViewer Init Error:", e);
@@ -1481,7 +1407,6 @@
                 }
             }
             
-            // Mouse interactive parallax
             document.addEventListener('mousemove', (e) => {
                 if(!mainSkinViewer || !mainSkinViewer.playerObject || document.body.classList.contains('portal-active') || reduceMotionEnabled) return;
                 const activeTab = document.querySelector('.tab-content.active');
@@ -1497,7 +1422,6 @@
             updateUIForActiveAccount();
         }
 
-        // --- 3D Character Pose & Animation Controller ---
         window.setPlayerAnimation = function(type, btnElement) {
             if (!mainSkinViewer || typeof skinview3d === 'undefined') return;
 
@@ -1542,7 +1466,6 @@
             }
         };
 
-        // --- Multi-Language Translations ---
         const translations = {
             en: {
                 ttPlay: "Play",
@@ -2147,8 +2070,26 @@
             }
         };
 
+        window.handlePlayBtnClick = function() {
+            if (isLaunching) {
+                cancelLaunch();
+            } else {
+                startPortalLaunch();
+            }
+        };
+
         function openSettings() { document.getElementById('settings-modal').classList.add('active'); }
         function closeSettings() { document.getElementById('settings-modal').classList.remove('active'); }
+
+        window.openChangelogModal = function() {
+            const modal = document.getElementById('changelog-modal');
+            if (modal) modal.classList.add('active');
+        };
+
+        window.closeChangelogModal = function() {
+            const modal = document.getElementById('changelog-modal');
+            if (modal) modal.classList.remove('active');
+        };
         
         window.applyFPSBooster = function() {
             const ramSlider = document.getElementById('ram-slider');
@@ -2685,20 +2626,17 @@
         }
 
         window.quickSelectVersion = function(ver, loader = 'vanilla') {
-            // ស្វែងរកមើលថាតើមាន Profile នៃ Version និង Loader នេះរួចហើយឬនៅ
             let targetProf = gameProfiles.find(p => p.version === ver && (p.loader || 'vanilla') === loader);
 
             if (targetProf) {
                 selectProfile(targetProf.id);
             } else {
-                // ប្តូរឈ្មោះ Profile ចាស់ៗទាំងអស់ដែលធ្លាប់ជា "Default Profile" ទៅជា "Profile [Version]"
                 gameProfiles.forEach(p => {
                     if (p.name === 'Default Profile' || p.name.startsWith('Default')) {
                         p.name = getProfileFormattedName(p);
                     }
                 });
 
-                // បង្កើត Profile ថ្មីដែលជា Default Profile
                 const newProf = {
                     id: 'prof_' + Date.now(),
                     name: 'Default Profile',
@@ -2876,7 +2814,6 @@
             activeProfileId = id;
             localStorage.setItem('longvek_active_profile_id', id);
             
-            // កំណត់ Profile ដែលបានជ្រើសរើសជា "Default Profile" ហើយប្តូរ Profile ចាស់ៗទៅជា "Profile [Version]"
             gameProfiles.forEach(p => {
                 if (p.id === id) {
                     p.name = "Default Profile";
@@ -2931,7 +2868,6 @@
             let name = nameInput?.value.trim();
             const icon = iconSelect?.value || 'ph-game-controller';
 
-            // ប្រសិនបើមិនបានវាយឈ្មោះទេ ដាក់ឈ្មោះ Default Profile ហើយប្តូរ Profile ចាស់ៗទៅជាឈ្មោះ Profile Version
             if (!name) {
                 name = 'Default Profile';
                 gameProfiles.forEach(p => {

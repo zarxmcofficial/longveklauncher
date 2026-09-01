@@ -274,10 +274,19 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'preload.js'),
+            // បិទ Cache ដើម្បីកុំឱ្យជាប់ទម្រង់ HTML ចាស់
+            webSecurity: true,
+            devTools: true
         }
     });
 
+    // បោសសម្អាត Cache ដើម្បីធានាថាទាញយក index.html ជំនាន់ថ្មី ១០០%
+    if (mainWindow.webContents.session) {
+        mainWindow.webContents.session.clearCache();
+    }
+
+    // Load ឯកសារ index.html ដោយផ្ទាល់
     mainWindow.loadFile('index.html');
 
     mainWindow.on('maximize', () => {
