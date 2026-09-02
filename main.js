@@ -1,8 +1,8 @@
-process.noDeprecation = true;
-const { app, BrowserWindow, ipcMain, shell, session, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const net = require('net');
 const axios = require('axios');
 const extract = require('extract-zip');
 const { Client, Authenticator } = require('minecraft-launcher-core');
@@ -521,13 +521,32 @@ ipcMain.on('ms-login', async (event, lang = 'en') => {
         }
 
         if (mclcAuthResult) {
+            // សម្អាតទិន្នន័យ Token ឱ្យនៅតែ String សុទ្ធ ដើម្បីការពារបញ្ហា IPC serialization failure
+            const cleanMclcAuth = {
+                access_token: String(mclcAuthResult.access_token || mclcAuthResult.mcToken || ''),
+                client_token: String(mclcAuthResult.client_token || 'longvek-launcher'),
+                uuid: String(mclcAuthResult.uuid || playerId),
+                name: String(playerName),
+                user_properties: "{}"
+            };
+
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                mainWindow.show();
+                mainWindow.focus();
+            }
+
             event.reply('ms-login-status', {
                 status: 'success',
                 account: {
-                    id: playerId,
+                    id: 'ms_' + playerId,
                     name: playerName,
                     type: 'microsoft',
-                    mclcAuth: mclcAuthResult
+                    role: 'Premium Account',
+                    accountCategory: 'premium',
+                    mclcAuth: cleanMclcAuth,
+                    skinName: playerName,
+                    playtimeMins: 0
                 }
             });
         } else {
@@ -535,9 +554,14 @@ ipcMain.on('ms-login', async (event, lang = 'en') => {
         }
     } catch (error) {
         console.error('MS Login Error:', error);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
+        }
         event.reply('ms-login-status', { 
             status: 'error', 
-            msg: error.message || (isKm ? 'ការចូលគណនីបានបរាជ័យ' : 'Login failed') 
+            msg: error.message || (isKm ? 'ការចូលគណនីបានបរាជ័យ ឬត្រូវបានបោះបង់' : 'Login failed or was cancelled') 
         });
     }
 });
@@ -576,11 +600,61 @@ ipcMain.on('launch-game', async (event, data) => {
     isLaunchAborted = false;
     const username = data.username || 'Player';
     const version = data.version || '1.20.4';
-    const maxMem = data.ram ? `${data.ram}G` : (data.maxRam || '4G');
-    const minMem = data.minRam || '2G';
     const authData = data.mclcAuth || data.msAuthObj;
     const isOffline = data.accountType !== 'microsoft' && !data.isMicrosoft;
     const profileId = data.profileId || 'default';
+
+    // --- SMART SAFE-RAM & ANTI-CRASH SYSTEM FOR LOW-END PCs ---
+    const sysTotalMemMB = Math.floor(os.totalmem() / (1024 * 1024));
+    const sysTotalMemGB = Math.round(sysTotalMemMB / 1024);
+    let requestedRamGB = parseInt(data.ram || (data.maxRam ? data.maxRam.replace('G', '') : '4')) || 4;
+
+    // ប្រសិនបើ PC ខ្សោយ (RAM 4GB ឬតិចជាង) ឬអ្នកប្រើកំណត់ RAM លើស 75% នៃ RAM ម៉ាស៊ីន
+    // យើងនឹងតម្រង់ RAM ឱ្យនៅកម្រិតសុវត្ថិភាពបំផុតដើម្បីការពារកុំឱ្យ Windows ខ្វះ RAM រួច crash បិទហ្គេម
+    let safeMaxRamGB = requestedRamGB;
+    if (sysTotalMemGB <= 4) {
+        safeMaxRamGB = Math.min(requestedRamGB, 2.5); // ទុក RAM យ៉ាងហោច 1.5GB ឱ្យ Windows & GPU
+        sendLogToUI(`[Smart Safe-RAM]: Low-end PC detected (${sysTotalMemGB}GB). Auto-optimizing RAM to ${safeMaxRamGB}GB to prevent crashes!`, 'system');
+    } else if (requestedRamGB >= sysTotalMemGB) {
+        safeMaxRamGB = Math.max(2, sysTotalMemGB - 2);
+        sendLogToUI(`[Smart Safe-RAM]: RAM clamped to safe limit (${safeMaxRamGB}GB) to prevent game termination.`, 'system');
+    }
+
+    const maxMem = `${safeMaxRamGB}G`;
+    const minMem = `${Math.max(1, Math.min(2, Math.floor(safeMaxRamGB / 2)))}G`;
+
+    // --- PRO-G1GC & ANTI-STUTTER FPS ENGINE FLAGS ---
+    // កូដ Java JVM ពិសេសសម្រាប់លុបបំបាត់ការកន្ត្រាក់ FPS (GC Stutters) និងជួយសន្សំសំចៃ RAM
+    const defaultUltraFpsFlags = [
+        "-XX:+UseG1GC",
+        "-XX:+ParallelRefProcEnabled",
+        "-XX:MaxGCPauseMillis=50", // បន្ថយ Pause Time ឱ្យខ្លីបំផុតដើម្បីកុំឱ្យធ្លាក់ FPS
+        "-XX:+UnlockExperimentalVMOptions",
+        "-XX:+DisableExplicitGC",
+        "-XX:+AlwaysPreTouch",
+        "-XX:G1NewSizePercent=25",
+        "-XX:G1MaxNewSizePercent=35",
+        "-XX:G1HeapRegionSize=8M",
+        "-XX:G1ReservePercent=15",
+        "-XX:G1HeapWastePercent=5",
+        "-XX:G1MixedGCCountTarget=4",
+        "-XX:InitiatingHeapOccupancyPercent=15",
+        "-XX:G1MixedGCLiveThresholdPercent=90",
+        "-XX:G1RSetUpdatingPauseTimePercent=5",
+        "-XX:SurvivorRatio=32",
+        "-XX:+PerfDisableSharedMem",
+        "-XX:MaxTenuringThreshold=1",
+        "-XX:+UseStringDeduplication", // ជួយកាត់បន្ថយការស៊ី RAM បាន 20% - 30% លើ PC ខ្សោយ
+        "-Dfml.ignoreInvalidMinecraftCertificates=true",
+        "-Dfml.ignorePatchDiscrepancies=true"
+    ];
+
+    // បញ្ចូល custom args របស់អ្នកប្រើប្រាស់ដោយមិនឱ្យជាន់គ្នា
+    const userArgs = Array.isArray(data.customArgs) ? data.customArgs : [];
+    const mergedArgs = [...defaultUltraFpsFlags];
+    userArgs.forEach(arg => {
+        if (!mergedArgs.includes(arg)) mergedArgs.push(arg);
+    });
 
     const instanceDir = path.join(rootPath, 'instances', profileId.replace(/[^a-zA-Z0-9]/g, '_'));
     if (!fs.existsSync(instanceDir)) fs.mkdirSync(instanceDir, { recursive: true });
@@ -590,8 +664,9 @@ ipcMain.on('launch-game', async (event, data) => {
     const cleanVersion = folderVersion.replace(/^(Fabric|Forge|OptiFine)\s*/i, '').trim();
     const lowerVersion = folderVersion.toLowerCase();
 
-    sendLogToUI(`Preparing to launch LONGVEKMC Launcher...`, 'system');
-    sendLogToUI(`Player: ${username} | Version: ${folderVersion} | RAM: ${maxMem}`, 'system');
+    sendLogToUI(`Initializing LONGVEK Ultra FPS Engine...`, 'system');
+    sendLogToUI(`System RAM: ${sysTotalMemGB}GB | Allocated RAM: ${maxMem} (Min: ${minMem})`, 'system');
+    sendLogToUI(`Player: ${username} | Version: ${folderVersion}`, 'system');
     setActivity(`In Game: ${folderVersion}`, `Playing as ${username}`);
 
     try {
@@ -611,7 +686,7 @@ ipcMain.on('launch-game', async (event, data) => {
             },
             version: { number: cleanVersion, type: 'release' },
             memory: { max: maxMem, min: minMem },
-            customArgs: data.customArgs || []
+            customArgs: mergedArgs
         };
 
         let useJavaPath = await ensureJava(cleanVersion);
@@ -637,7 +712,7 @@ ipcMain.on('launch-game', async (event, data) => {
         launcher.on('data', () => {
             if (!hasGameStarted) {
                 hasGameStarted = true;
-                sendLogToUI('Game successfully launched!', 'success');
+                sendLogToUI('Game successfully launched! Ultra FPS Engine Active.', 'success');
             }
         });
 
@@ -657,7 +732,11 @@ ipcMain.on('launch-game', async (event, data) => {
         });
 
         launcher.on('close', (code) => {
-            sendLogToUI(`Game closed (Code: ${code})`, 'warning');
+            if (code === 0) {
+                sendLogToUI(`Game closed normally.`, 'info');
+            } else {
+                sendLogToUI(`Game closed with code: ${code}. Anti-Crash system saved log.`, 'warning');
+            }
             setActivity('In Launcher', 'Ready to play...');
             event.reply('launch-status', { msg: 'Game Closed', progress: 0, status: 'stopped' });
             event.reply('game-closed', code);
@@ -668,7 +747,7 @@ ipcMain.on('launch-game', async (event, data) => {
             return;
         }
 
-        sendLogToUI(`Initializing Launch Sequence in [${instanceDir}]...`, 'info');
+        sendLogToUI(`Starting Minecraft smoothly on [${instanceDir}]...`, 'info');
         await launcher.launch(opts);
     } catch (error) {
         sendLogToUI(`Launch Error: ${error.message}`, 'error');
@@ -838,6 +917,88 @@ ipcMain.on('apply-fps-boost', (_event, profileId) => {
         console.log(`[FPS Boost] Prepared instance folder for boost: ${instanceDir}`);
     } catch (err) {
         console.error('FPS Boost failed:', err);
+    }
+});
+
+// --- P2P Friend Worlds (e4mc & LAN Bridge Handlers) ---
+ipcMain.on('copy-to-clipboard', (_event, text) => {
+    if (typeof text === 'string') {
+        clipboard.writeText(text);
+    }
+});
+
+ipcMain.handle('check-p2p-domain', async (_event, targetAddress) => {
+    if (!targetAddress || typeof targetAddress !== 'string') {
+        return { online: false, error: 'Invalid address' };
+    }
+
+    let host = targetAddress.trim().replace(/^https?:\/\//i, '');
+    let port = 25565;
+
+    if (host.includes(':')) {
+        const parts = host.split(':');
+        host = parts[0];
+        port = parseInt(parts[1]) || 25565;
+    }
+
+    const startTime = Date.now();
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+        socket.setTimeout(4500);
+
+        socket.on('connect', () => {
+            const latency = Date.now() - startTime;
+            socket.destroy();
+            resolve({ online: true, latency, host, port });
+        });
+
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve({ online: false, error: 'Connection timed out' });
+        });
+
+        socket.on('error', (err) => {
+            socket.destroy();
+            resolve({ online: false, error: err.message });
+        });
+
+        socket.connect(port, host);
+    });
+});
+
+ipcMain.handle('install-e4mc-mod', async (_event, { profileId, version, loader }) => {
+    try {
+        const targetLoader = (loader || 'fabric').toLowerCase();
+        let cleanVer = (version || '1.20.1').replace(/^(Fabric|Forge|OptiFine)\s*/i, '').trim();
+
+        // កំណត់ instance mods directory
+        const instanceDir = path.join(rootPath, 'instances', (profileId || 'default').replace(/[^a-zA-Z0-9]/g, '_'));
+        const targetModsDir = path.join(instanceDir, 'mods');
+        if (!fs.existsSync(targetModsDir)) fs.mkdirSync(targetModsDir, { recursive: true });
+
+        // ស្វែងរក mod e4mc ពី Modrinth API ដោយស្វ័យប្រវត្តិ
+        const apiUrl = `https://api.modrinth.com/v2/project/e4mc/version?loaders=["${targetLoader === 'forge' ? 'forge' : 'fabric'}"]&game_versions=["${cleanVer}"]`;
+        const res = await axios.get(apiUrl, { timeout: 8000 });
+
+        if (!Array.isArray(res.data) || res.data.length === 0 || !res.data[0].files || res.data[0].files.length === 0) {
+            // បើមិនឃើញ version ជាក់លាក់ ទាញយក generic version ចុងក្រោយ
+            const fallbackRes = await axios.get('https://api.modrinth.com/v2/project/e4mc/version', { timeout: 8000 });
+            if (!Array.isArray(fallbackRes.data) || fallbackRes.data.length === 0) {
+                return { success: false, error: 'No compatible e4mc version found on Modrinth.' };
+            }
+            const file = fallbackRes.data[0].files[0];
+            const destPath = path.join(targetModsDir, file.filename);
+            await downloadFile(file.url, destPath, 'e4mc Mod Engine');
+            return { success: true, filename: file.filename };
+        }
+
+        const file = res.data[0].files[0];
+        const destPath = path.join(targetModsDir, file.filename);
+        await downloadFile(file.url, destPath, 'e4mc Mod Engine');
+        return { success: true, filename: file.filename };
+    } catch (err) {
+        console.error('Failed to auto-install e4mc:', err);
+        return { success: false, error: err.message };
     }
 });
 

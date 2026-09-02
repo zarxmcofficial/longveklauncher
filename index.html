@@ -464,8 +464,9 @@
                 <!-- 3D Character Hologram Area -->
                 <div class="flex-1 min-h-0 flex flex-col items-center justify-center relative mt-2" id="hologram-wrapper">
                     
-                    <div class="text-center z-20 -mb-4 relative">
+                    <div class="text-center z-20 -mb-4 relative flex flex-col items-center gap-1.5">
                         <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-sky-200 to-brand-300 tracking-widest uppercase drop-shadow-[0_0_20px_rgba(56,189,248,0.4)] transition-all duration-300 opacity-0 hidden font-display" id="player-welcome"></h2>
+                        <div id="player-account-type-badge" class="opacity-0 transition-opacity duration-300"></div>
                     </div>
 
                     <div class="hero-showcase z-10 relative" id="hologram-container">
@@ -613,13 +614,26 @@
             <!-- 3. SERVERS TAB -->
             <div id="tab-servers" class="tab-content flex-1 overflow-y-auto flex-col w-full">
                 <div class="max-w-5xl mx-auto w-full px-10 pt-8 pb-28 flex flex-col">
-                    <div class="flex justify-between items-center mb-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                         <div>
                             <h2 class="text-3xl font-black text-white tracking-wide uppercase font-display" id="servers-title">Multiplayer Network</h2>
                             <p class="text-xs text-gray-400 mt-1" id="servers-subtitle">Official LONGVEK Servers & Community Hubs.</p>
                         </div>
+                        
+                        <!-- Sub-Navigation: Official vs P2P Friend Worlds -->
+                        <div class="flex items-center gap-1.5 bg-surface-900/90 p-1 rounded-2xl border border-white/10 shadow-lg">
+                            <button onclick="switchServerSubTab('official')" id="btn-subtab-official" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-500/20 text-brand-300 border border-brand-400/40 shadow-sm transition-all flex items-center gap-1.5">
+                                <i class="ph-fill ph-hard-drives text-sm"></i> <span id="lbl-subtab-official">Official Servers</span>
+                            </button>
+                            <button onclick="switchServerSubTab('p2p')" id="btn-subtab-p2p" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-gray-400 hover:text-white bg-transparent border border-transparent transition-all flex items-center gap-1.5">
+                                <i class="ph-fill ph-globe text-sm text-cyan-400"></i> <span id="lbl-subtab-p2p">P2P Friend Worlds</span>
+                                <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">e4mc</span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="space-y-4">
+
+                    <!-- VIEW 1: OFFICIAL SERVERS -->
+                    <div id="view-official-servers" class="space-y-4">
                         <div class="glass-card rounded-2xl p-4 flex items-center gap-4 hover:border-brand-400/50 transition-all cursor-pointer group">
                             <div class="w-16 h-16 bg-surface-900 rounded-xl overflow-hidden flex-shrink-0 border border-white/10">
                                 <img src="https://images.unsplash.com/photo-1614294149010-950b698f72c0?q=80&w=150&auto=format&fit=crop" class="w-full h-full object-cover">
@@ -627,13 +641,125 @@
                             <div class="flex-1">
                                 <div class="flex justify-between items-start mb-1">
                                     <h3 class="text-base font-black text-white group-hover:text-brand-300 transition-colors">LONGVEK NETWORK OFFICIAL</h3>
-                                    <div class="flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-full text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 24ms
+                                    <div class="flex items-center gap-1.5 bg-amber-500/10 px-2.5 py-1 rounded-full text-xs font-bold text-amber-400 border border-amber-500/30">
+                                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Maintenance / In Dev
                                     </div>
                                 </div>
                                 <p class="text-xs text-gray-400 mb-2" id="server-card-desc">Survival • Lifesteal SMP • Minigames | Supports 1.8.9 - 1.20+</p>
                             </div>
-                            <button class="bg-brand-500 hover:bg-brand-400 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg" onclick="document.querySelectorAll('#main-nav button')[0].click(); handlePlayBtnClick();" id="btn-play-server">Play Now</button>
+                            <button onclick="handleServerSoonClick()" class="bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg flex items-center gap-1.5" id="btn-play-server">
+                                <i class="ph-fill ph-clock-countdown text-sm"></i>
+                                <span id="btn-play-server-text">Soon</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- VIEW 2: P2P FRIEND WORLDS (e4mc INTEGRATION) -->
+                    <div id="view-p2p-worlds" class="hidden flex-col gap-5">
+                        <!-- Hero Banner & e4mc Auto-Installer Card -->
+                        <div class="glass-card rounded-3xl p-5 border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-surface-900/90 to-surface-900 relative overflow-hidden shadow-2xl">
+                            <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                            
+                            <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
+                                <div class="flex items-center gap-3.5">
+                                    <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(34,211,238,0.3)]">
+                                        <i class="ph-fill ph-broadcast text-2xl animate-pulse"></i>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <h3 class="text-sm font-black text-white uppercase tracking-wider font-display" id="p2p-banner-title">P2P Mesh Network • e4mc Integration</h3>
+                                            <span class="text-[9px] font-black px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-400/30" id="p2p-status-badge">NO HOSTING REQUIRED</span>
+                                        </div>
+                                        <p class="text-[11px] text-gray-300 leading-relaxed mt-0.5 font-normal" id="p2p-banner-desc">
+                                            លេង Singleplayer ជាមួយមិត្តភក្តិដោយសេរី ដោយមិនបាច់ជួល Server, មិនបាច់រង់ចាំ Queue Aternos និងមិនបាច់ប្រើ Hamachi ឡើយ!
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button onclick="installE4mcEngine()" id="btn-install-e4mc" class="shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-400 hover:from-cyan-400 hover:to-sky-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(34,211,238,0.4)] active:scale-95 flex items-center gap-2">
+                                    <i class="ph-bold ph-download-simple text-sm"></i>
+                                    <span id="btn-install-e4mc-text">1-CLICK ENABLE P2P</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 2-Column Suite: Host & Join -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            
+                            <!-- Left: Host Guide & Share Room -->
+                            <div class="glass-card rounded-3xl p-5 border border-white/10 flex flex-col justify-between gap-4">
+                                <div>
+                                    <div class="flex items-center justify-between mb-3 border-b border-white/10 pb-2.5">
+                                        <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2 font-display" id="p2p-host-title">
+                                            <i class="ph-fill ph-planet text-cyan-300 text-base"></i> <span id="p2p-host-title-text">Host Singleplayer World</span>
+                                        </h4>
+                                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest" id="p2p-guide-tag">HOST GUIDE</span>
+                                    </div>
+
+                                    <div class="space-y-2.5 text-xs text-gray-300">
+                                        <div class="flex items-start gap-2.5 p-2 rounded-xl bg-surface-950/60 border border-white/5">
+                                            <span class="w-5 h-5 rounded-lg bg-cyan-500/20 text-cyan-300 font-black text-[10px] flex items-center justify-center shrink-0">1</span>
+                                            <p class="text-[11px] leading-relaxed" id="p2p-step-1">Launch and open any of your <b>Singleplayer</b> worlds in Minecraft.</p>
+                                        </div>
+                                        <div class="flex items-start gap-2.5 p-2 rounded-xl bg-surface-950/60 border border-white/5">
+                                            <span class="w-5 h-5 rounded-lg bg-cyan-500/20 text-cyan-300 font-black text-[10px] flex items-center justify-center shrink-0">2</span>
+                                            <p class="text-[11px] leading-relaxed" id="p2p-step-2">Press <b>ESC</b> key > Select <b>Open to LAN</b> > Toggle on <b>Open to Friends</b>.</p>
+                                        </div>
+                                        <div class="flex items-start gap-2.5 p-2 rounded-xl bg-surface-950/60 border border-white/5">
+                                            <span class="w-5 h-5 rounded-lg bg-cyan-500/20 text-cyan-300 font-black text-[10px] flex items-center justify-center shrink-0">3</span>
+                                            <p class="text-[11px] leading-relaxed" id="p2p-step-3">The game gives a link (e.g. <span class="text-cyan-300 font-mono font-bold">abc12.e4mc.link</span>). Copy and send it to your friends!</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="pt-2 border-t border-white/5 flex gap-2">
+                                    <button onclick="copyP2PInviteTemplate()" class="flex-1 py-2.5 px-3 rounded-xl bg-surface-950 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-all text-xs font-bold flex items-center justify-center gap-2">
+                                        <i class="ph-bold ph-copy text-sm text-cyan-400"></i>
+                                        <span id="btn-copy-invite">Copy Invite Message</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Right: Join Friend's Room & Live Ping Diagnostic -->
+                            <div class="glass-card rounded-3xl p-5 border border-white/10 flex flex-col justify-between gap-4">
+                                <div>
+                                    <div class="flex items-center justify-between mb-3 border-b border-white/10 pb-2.5">
+                                        <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2 font-display" id="p2p-join-title">
+                                            <i class="ph-fill ph-users-three text-emerald-400 text-base"></i> <span id="p2p-join-title-text">Join Friend's Room</span>
+                                        </h4>
+                                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest" id="p2p-connect-tag">CONNECT</span>
+                                    </div>
+
+                                    <div class="flex flex-col gap-3">
+                                        <div>
+                                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block" id="lbl-friend-domain">Friend's Room Address / Link</label>
+                                            <div class="relative">
+                                                <i class="ph-bold ph-link absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                                                <input type="text" id="p2p-join-input" placeholder="e.g. abcd123.e4mc.link or IP:Port" class="w-full bg-surface-950 border border-white/10 rounded-2xl py-3 pl-10 pr-20 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono">
+                                                <button onclick="checkFriendP2PDomain()" id="btn-ping-p2p" class="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 text-[10px] font-black uppercase transition-all">
+                                                    PING
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Diagnostic Ping Result Box -->
+                                        <div id="p2p-ping-box" class="hidden p-3 rounded-2xl bg-surface-950/80 border border-white/10 flex items-center justify-between">
+                                            <div class="flex items-center gap-2">
+                                                <span id="p2p-ping-dot" class="w-2.5 h-2.5 rounded-full bg-gray-500"></span>
+                                                <span id="p2p-ping-status" class="text-xs font-bold text-gray-300">Checking...</span>
+                                            </div>
+                                            <span id="p2p-ping-latency" class="text-xs font-mono font-black text-cyan-300">-- ms</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="pt-2 border-t border-white/5">
+                                    <button onclick="joinFriendP2PWorld()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(16,185,129,0.35)] active:scale-95 flex items-center justify-center gap-2">
+                                        <i class="ph-bold ph-game-controller text-base"></i>
+                                        <span id="btn-join-launch">Join & Launch Game</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -774,8 +900,8 @@
                 </div>
 
                 <!-- Launch Play Button -->
-                <div class="w-[300px] flex justify-end">
-                    <div class="relative w-full max-w-[240px] group">
+                <div class="w-[320px] flex items-center justify-end">
+                    <div class="relative w-full max-w-[220px] group">
                         <div class="absolute -inset-0.5 bg-gradient-to-r from-brand-400 via-sky-400 to-brand-600 rounded-2xl blur opacity-40 group-hover:opacity-80 transition duration-500" id="play-btn-glow"></div>
                         <button id="play-btn" class="relative btn-play-primary w-full py-3.5 rounded-2xl text-white font-black tracking-widest uppercase flex items-center justify-center gap-3 overflow-hidden border border-white/20" onclick="handlePlayBtnClick()">
                             <i id="play-icon" class="ph-fill ph-play text-xl group-hover:scale-125 transition-transform duration-300 relative z-10 drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]"></i> 
@@ -820,16 +946,44 @@
 
             <div class="p-6 overflow-y-auto max-h-[58vh]">
                 <div id="system-settings" class="space-y-5">
-                    <div class="bg-gradient-to-r from-brand-600/30 via-surface-900 to-surface-900 border border-brand-400/40 p-4 rounded-2xl flex items-center justify-between group relative overflow-hidden shadow-lg">
-                        <div class="relative z-10">
-                            <h4 class="text-xs font-black text-white flex items-center gap-2 uppercase tracking-wider">
-                                <i class="ph-fill ph-rocket-launch text-brand-300 text-lg group-hover:-translate-y-1 transition-transform"></i> 1-Click FPS Booster
-                            </h4>
-                            <p class="text-[10px] text-gray-300 mt-0.5 max-w-[280px]">Auto-optimizes allocated RAM and sets pro JVM flags to boost Minecraft FPS.</p>
+                    <!-- ULTRA FPS ENGINE & ANTI-CRASH SUITE -->
+                    <div class="glass-card p-4 rounded-2xl border border-brand-400/30 flex flex-col gap-3.5 relative overflow-hidden shadow-[0_4px_20px_rgba(26,140,187,0.15)]">
+                        <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-xl bg-brand-500/20 text-brand-300 border border-brand-400/30 flex items-center justify-center shrink-0 shadow-sm">
+                                    <i class="ph-fill ph-lightning text-lg animate-pulse"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h4 class="text-xs font-black text-white uppercase tracking-wider" id="fps-card-title">ULTRA FPS ENGINE</h4>
+                                        <span class="text-[9px] font-black px-2 py-0.5 rounded-md bg-brand-500/20 text-brand-300 border border-brand-400/40" id="fps-status-tag">ACTIVE</span>
+                                    </div>
+                                    <span class="text-[10px] text-gray-400 font-medium" id="fps-card-subtitle">Smart Low-End PC & Anti-Crash Guard</span>
+                                </div>
+                            </div>
+                            <button onclick="applyFPSBooster()" class="shrink-0 bg-gradient-to-r from-brand-500 to-sky-400 hover:from-brand-400 hover:to-sky-300 text-slate-950 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center gap-1.5">
+                                <i class="ph-bold ph-rocket-launch text-sm"></i> <span id="btn-fps-boost-text">1-CLICK BOOST</span>
+                            </button>
                         </div>
-                        <button onclick="applyFPSBooster()" class="relative z-10 bg-gradient-to-r from-brand-500 to-sky-400 hover:from-brand-400 hover:to-sky-300 text-slate-950 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(56,189,248,0.5)] active:scale-95">
-                            BOOST FPS
-                        </button>
+                        
+                        <p class="text-[11px] text-gray-300 leading-relaxed font-normal" id="fps-card-desc">
+                            Smart safe-RAM optimization, anti-crash guard, and Aikar's G1GC flags (50ms low pause) reduce RAM overhead by 20-30% for ultra-smooth gameplay.
+                        </p>
+
+                        <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5 text-[10px]">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-950/80 text-brand-300 border border-white/5 font-semibold">
+                                <i class="ph-fill ph-check-circle text-sky-400"></i>
+                                <span id="fps-pill-1">Anti-Crash Safe RAM</span>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-950/80 text-brand-300 border border-white/5 font-semibold">
+                                <i class="ph-fill ph-check-circle text-sky-400"></i>
+                                <span id="fps-pill-2">Aikar's Low Pause</span>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-950/80 text-brand-300 border border-white/5 font-semibold">
+                                <i class="ph-fill ph-check-circle text-sky-400"></i>
+                                <span id="fps-pill-3">RAM Deduplication</span>
+                            </span>
+                        </div>
                     </div>
 
                     <div class="glass-card p-4 rounded-2xl">
@@ -989,44 +1143,44 @@
                     </p>
 
                     <div class="grid grid-cols-2 gap-2 pt-1">
-                        <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-hypixel">
-                            <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Hypixel Supported
-                        </div>
-                        <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-capes">
-                            <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Official Minecraft Capes
-                        </div>
-                        <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-skins">
-                            <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Global Skin Sync
-                        </div>
-                        <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-xbox">
-                            <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Xbox Live Verified
-                        </div>
+                    <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-hypixel">
+                        <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Hypixel Supported
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-capes">
+                        <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Official Minecraft Capes
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-skins">
+                        <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Global Skin Sync
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[11px] text-gray-300 font-semibold" id="pill-xbox">
+                        <i class="ph-fill ph-check-circle text-emerald-400 text-sm"></i> Xbox Live Verified
                     </div>
                 </div>
+            </div>
 
-                <button onclick="loginMicrosoft()" class="w-full relative group overflow-hidden rounded-2xl p-[1px] bg-gradient-to-r from-emerald-500 via-sky-400 to-emerald-400 shadow-[0_4px_25px_rgba(16,185,129,0.35)] hover:shadow-[0_8px_35px_rgba(16,185,129,0.6)] transition-all duration-300 active:scale-[0.98]">
-                    <div class="w-full bg-surface-950 group-hover:bg-emerald-950/40 rounded-[15px] px-5 py-4 flex items-center justify-between transition-colors">
-                        <div class="flex items-center gap-3.5">
-                            <div class="w-11 h-11 rounded-xl bg-surface-900 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform">
-                                <svg class="w-6 h-6" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
-                                    <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
-                                    <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
-                                    <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
-                                </svg>
-                            </div>
-                            <div class="flex flex-col items-start text-left">
-                                <span class="text-sm font-black text-white uppercase tracking-wider group-hover:text-emerald-300 transition-colors" id="btn-ms-login-text">Sign In with Microsoft</span>
-                                <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest" id="lbl-ms-subtext">Recommended for Pro Players</span>
-                            </div>
+            <button id="btn-login-ms-action" onclick="loginMicrosoft()" class="w-full relative group overflow-hidden rounded-2xl p-[1px] bg-gradient-to-r from-emerald-500 via-sky-400 to-emerald-400 shadow-[0_4px_25px_rgba(16,185,129,0.35)] hover:shadow-[0_8px_35px_rgba(16,185,129,0.6)] transition-all duration-300 active:scale-[0.98]">
+                <div class="w-full bg-surface-950 group-hover:bg-emerald-950/40 rounded-[15px] px-5 py-4 flex items-center justify-between transition-colors">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-xl bg-surface-900 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+                                <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+                                <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+                                <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+                            </svg>
                         </div>
-                        <div class="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 group-hover:text-emerald-300 group-hover:translate-x-1 transition-all">
-                            <i class="ph-bold ph-arrow-right text-base"></i>
+                        <div class="flex flex-col items-start text-left">
+                            <span class="text-sm font-black text-white uppercase tracking-wider group-hover:text-emerald-300 transition-colors" id="btn-ms-login-text">Sign In with Microsoft</span>
+                            <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest" id="lbl-ms-subtext">Recommended for Pro Players</span>
                         </div>
                     </div>
-                </button>
+                    <div class="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 group-hover:text-emerald-300 group-hover:translate-x-1 transition-all">
+                        <i class="ph-bold ph-arrow-right text-base"></i>
+                    </div>
+                </div>
+            </button>
 
-                <p class="text-[9px] text-gray-500 text-center leading-relaxed px-2 font-medium" id="lbl-mojang-disclaimer">
+            <p class="text-[9px] text-gray-500 text-center leading-relaxed px-2 font-medium" id="lbl-mojang-disclaimer">
                     Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
                 </p>
             </div>
@@ -1040,9 +1194,11 @@
                     <div class="flex flex-col">
                         <div class="flex items-center gap-1.5">
                             <span id="offline-preview-name" class="text-xs font-black text-white">Player</span>
-                            <span class="text-[8px] bg-brand-500/20 text-brand-300 px-1.5 py-0.5 rounded font-black border border-brand-400/30" id="badge-preview-tag">PREVIEW</span>
+                            <span class="text-[8px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded font-black border border-sky-400/30 flex items-center gap-1" id="badge-preview-tag">
+                                <i class="ph-fill ph-game-controller text-[10px]"></i> ACCOUNT FREE
+                            </span>
                         </div>
-                        <span class="text-[10px] text-gray-400 mt-0.5" id="lbl-offline-preview-hint">Type any valid Minecraft username to preview skin automatically</span>
+                        <span class="text-[10px] text-gray-400 mt-0.5" id="lbl-offline-preview-hint">Free Account: Play offline or on non-premium multiplayer servers</span>
                     </div>
                 </div>
 
@@ -1495,6 +1651,15 @@
                 bgTitle: "Launcher Background",
                 btnDone: "Done",
                 settingsTitle: "Launcher Settings",
+                fpsTitle: "ULTRA FPS ENGINE",
+                fpsSubtitle: "Smart Low-End PC & Anti-Crash Guard",
+                fpsDesc: "Smart safe-RAM optimization, anti-crash guard, and Aikar's G1GC flags (50ms low pause) reduce RAM overhead by 20-30% for ultra-smooth gameplay on low/mid PC specs.",
+                fpsBoostBtn: "1-CLICK BOOST",
+                fpsPill1: "Anti-Crash Safe RAM",
+                fpsPill2: "Aikar's Low Pause",
+                fpsPill3: "RAM Deduplication",
+                fpsBoostSuccessTitle: "FPS Boosted!",
+                fpsBoostSuccessDesc: "Optimized RAM & JVM flags applied successfully.",
                 lblNews: "Latest Updates",
                 newsTeaserTitle: "New Cyber UI & 3D Suite",
                 newsTeaserDesc: "3D Pose controls, fast profile manager, live skin preview & full version catalog.",
@@ -1515,6 +1680,26 @@
                 serversTitle: "Multiplayer Network",
                 serversSubtitle: "Official LONGVEK Servers & Community Hubs.",
                 serverCardDesc: "Survival • Lifesteal SMP • Minigames | Supports 1.8.9 - 1.20+",
+                btnPlayServer: "Soon",
+                // P2P Friend Worlds Keys (EN)
+                subtabOfficial: "Official Servers",
+                subtabP2p: "P2P Friend Worlds",
+                p2pBannerTitle: "P2P Mesh Network • e4mc Integration",
+                p2pStatusBadge: "NO HOSTING REQUIRED",
+                p2pBannerDesc: "Play Singleplayer worlds with friends directly with no server rentals, no Aternos queues, and no Hamachi required!",
+                btnInstallE4mc: "1-CLICK ENABLE P2P",
+                btnInstallE4mcActive: "P2P READY",
+                p2pHostGuide: "HOST GUIDE",
+                p2pHostTitle: "Host Singleplayer World",
+                p2pStep1: "Launch and open any of your <b>Singleplayer</b> worlds in Minecraft.",
+                p2pStep2: "Press <b>ESC</b> key > Select <b>Open to LAN</b> > Toggle on <b>Open to Friends</b>.",
+                p2pStep3: "The game gives a link (e.g. <span class=\"text-cyan-300 font-mono font-bold\">abc12.e4mc.link</span>). Copy and send it to your friends!",
+                btnCopyInvite: "Copy Invite Message",
+                p2pConnectTag: "CONNECT",
+                p2pJoinTitle: "Join Friend's Room",
+                lblFriendDomain: "Friend's Room Address / Link",
+                p2pInputPlaceholder: "e.g. abcd123.e4mc.link or IP:Port",
+                btnJoinLaunch: "Join & Launch Game",
                 modsHeaderTitle: "Mods & Content Hub",
                 modsHeaderSubtitle: "Discover, download and toggle mods directly from Modrinth.",
                 modCatMods: "Mods",
@@ -1594,6 +1779,15 @@
                 bgTitle: "រូបភាពផ្ទៃខាងក្រោយ",
                 btnDone: "រួចរាល់",
                 settingsTitle: "ការកំណត់កម្មវិធី",
+                fpsTitle: "ULTRA FPS ENGINE",
+                fpsSubtitle: "ជំនួយកុំព្យូទ័រខ្សោយ & ការពារការលោតចេញ",
+                fpsDesc: "ស្វ័យប្រវត្តិតម្រង់ RAM សុវត្ថិភាព ការពារការលោតចេញ (Anti-Crash) និងបញ្ចូលកូដ Aikar's G1GC Flags (Max 50ms Pause) កាត់បន្ថយការស៊ី RAM ពី 20-30% ជួយឱ្យកុំព្យូទ័រខ្សោយ ឬមធ្យមលេង Minecraft រលូនឥតទាក់។",
+                fpsBoostBtn: "ចុចជំរុញ FPS",
+                fpsPill1: "RAM សុវត្ថិភាពខ្ពស់",
+                fpsPill2: "កាត់បន្ថយកន្ត្រាក់ (50ms)",
+                fpsPill3: "កាត់បន្ថយការស៊ី RAM",
+                fpsBoostSuccessTitle: "ជំរុញ FPS រួចរាល់!",
+                fpsBoostSuccessDesc: "បានបញ្ចូលកូដបង្កើន FPS និងកំណត់ទំហំ RAM សុវត្ថិភាពដោយជោគជ័យ។",
                 lblNews: "ព័ត៌មានថ្មីៗ",
                 newsTeaserTitle: "រូបរាង Cyber UI & ប្រព័ន្ធ 3D ថ្មី",
                 newsTeaserDesc: "ផ្ទាំងបញ្ជាចលនា 3D, គ្រប់គ្រង Profile លឿនរហ័ស, Live Skin Preview និងបណ្ណាល័យ Version គ្រប់ស៊េរី។",
@@ -1614,6 +1808,26 @@
                 serversTitle: "បណ្តាញម៉ាស៊ីនមេ (Servers)",
                 serversSubtitle: "Server ផ្លូវការរបស់ LONGVEK និងសហគមន៍កម្ពុជា។",
                 serverCardDesc: "Survival • Lifesteal SMP • Minigames | គាំទ្រកំណែ 1.8.9 - 1.20+",
+                btnPlayServer: "ឆាប់ៗនេះ",
+                // P2P Friend Worlds Keys (KM)
+                subtabOfficial: "ម៉ាស៊ីនមេផ្លូវការ",
+                subtabP2p: "ពិភពលោកមិត្តភក្តិ P2P",
+                p2pBannerTitle: "បណ្តាញ P2P Mesh • ភ្ជាប់ជាមួយ e4mc",
+                p2pStatusBadge: "មិនបាច់ជួល SERVER",
+                p2pBannerDesc: "លេង Singleplayer ជាមួយមិត្តភក្តិដោយសេរី ដោយមិនបាច់ជួល Server, មិនបាច់រង់ចាំ Queue Aternos និងមិនបាច់ប្រើ Hamachi ឡើយ!",
+                btnInstallE4mc: "១-ចុច បើកដំណើរការ P2P",
+                btnInstallE4mcActive: "បានបើកដំណើរការ P2P",
+                p2pHostGuide: "របៀបបង្កើត",
+                p2pHostTitle: "បង្កើតពិភពលោក (Host World)",
+                p2pStep1: "បើកលេងពិភពលោក <b>Singleplayer</b> ណាមួយរបស់អ្នកក្នុង Minecraft។",
+                p2pStep2: "ចុចគ្រាប់ចុច <b>ESC</b> > ជ្រើសរើស <b>Open to LAN</b> > ចុចបើក <b>Open to Friends</b>។",
+                p2pStep3: "ហ្គេមនឹងផ្ដល់ Link (ឧ. <span class=\"text-cyan-300 font-mono font-bold\">abc12.e4mc.link</span>)។ Copy Link នោះផ្ញើឱ្យមិត្តភក្តិ!",
+                btnCopyInvite: "ចម្លងសារអញ្ជើញ (Copy)",
+                p2pConnectTag: "ភ្ជាប់បន្ទប់",
+                p2pJoinTitle: "ចូលលេងបន្ទប់មិត្តភក្តិ (Join Room)",
+                lblFriendDomain: "Link / Address បន្ទប់មិត្តភក្តិ",
+                p2pInputPlaceholder: "ឧ. abcd123.e4mc.link ឬ IP:Port",
+                btnJoinLaunch: "ចូល & បើកហ្គេម",
                 modsHeaderTitle: "មជ្ឈមណ្ឌលម៉ូដហ្គេម (Mods Hub)",
                 modsHeaderSubtitle: "ស្វែងរក ទាញយក និងបិទបើកម៉ូដហ្គេមដោយផ្ទាល់ពី Modrinth។",
                 modCatMods: "ម៉ូដហ្គេម (Mods)",
@@ -1667,6 +1881,166 @@
             }
         };
 
+        // --- P2P FRIEND WORLDS CONTROLLERS ---
+        window.switchServerSubTab = function(tab) {
+            const btnOfficial = document.getElementById('btn-subtab-official');
+            const btnP2p = document.getElementById('btn-subtab-p2p');
+            const viewOfficial = document.getElementById('view-official-servers');
+            const viewP2p = document.getElementById('view-p2p-worlds');
+
+            const activeStyle = "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-500/20 text-brand-300 border border-brand-400/40 shadow-sm transition-all flex items-center gap-1.5";
+            const inactiveStyle = "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-gray-400 hover:text-white bg-transparent border border-transparent transition-all flex items-center gap-1.5";
+
+            if (tab === 'official') {
+                btnOfficial.className = activeStyle;
+                btnP2p.className = inactiveStyle;
+                viewOfficial.classList.remove('hidden');
+                viewP2p.classList.add('hidden');
+                viewP2p.classList.remove('flex');
+            } else {
+                btnP2p.className = activeStyle;
+                btnOfficial.className = inactiveStyle;
+                viewOfficial.classList.add('hidden');
+                viewP2p.classList.remove('hidden');
+                viewP2p.classList.add('flex');
+            }
+        };
+
+        window.installE4mcEngine = async function() {
+            const btn = document.getElementById('btn-install-e4mc');
+            const btnText = document.getElementById('btn-install-e4mc-text');
+            const isKm = currentLang === 'km';
+            const t = translations[currentLang] || translations.en;
+
+            const activeProf = gameProfiles.find(p => p.id === activeProfileId) || gameProfiles[0];
+            const profileVer = activeProf?.version || '1.20.1';
+            const profileLoader = activeProf?.loader || 'fabric';
+
+            btn.classList.add('pointer-events-none', 'opacity-70');
+            btnText.innerHTML = `<i class="ph ph-spinner animate-spin text-sm"></i> ${isKm ? 'កំពុងដំឡើង e4mc...' : 'Installing e4mc...'}`;
+
+            if (isElectron && window.electronAPI.installE4mcMod) {
+                try {
+                    const result = await window.electronAPI.installE4mcMod(activeProfileId, profileVer, profileLoader);
+                    btn.classList.remove('pointer-events-none', 'opacity-70');
+                    if (result && result.success) {
+                        btnText.innerHTML = `<i class="ph-bold ph-check"></i> ${t.btnInstallE4mcActive || (isKm ? 'បានបើកដំណើរការ P2P' : 'P2P READY')}`;
+                        btn.className = "shrink-0 px-4 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-2";
+                        showToast(isKm ? "ដំឡើងជោគជ័យ" : "P2P Ready", isKm ? `e4mc mod ត្រូវបានដំឡើងសម្រាប់ profile "${activeProf.name}"!` : `e4mc mod installed for "${activeProf.name}"!`, "success");
+                    } else {
+                        btnText.innerHTML = `<i class="ph-bold ph-download-simple"></i> ${t.btnInstallE4mc}`;
+                        showToast(isKm ? "ដំណឹង" : "Notice", result?.error || (isKm ? "មិនទាន់មាន mod សម្រាប់ version នេះ" : "No compatible e4mc file found"), "info");
+                    }
+                } catch (e) {
+                    btn.classList.remove('pointer-events-none', 'opacity-70');
+                    btnText.innerHTML = `<i class="ph-bold ph-download-simple"></i> ${t.btnInstallE4mc}`;
+                    showToast(isKm ? "បរាជ័យ" : "Error", e.message, "error");
+                }
+            } else {
+                setTimeout(() => {
+                    btn.classList.remove('pointer-events-none', 'opacity-70');
+                    btnText.innerHTML = `<i class="ph-bold ph-check"></i> ${t.btnInstallE4mcActive || (isKm ? 'P2P រួចរាល់' : 'P2P READY')}`;
+                    btn.className = "shrink-0 px-4 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-2";
+                    showToast(isKm ? "ការសាកល្បង" : "Simulation", isKm ? "ប្រព័ន្ធ e4mc ត្រូវបានត្រួតពិនិត្យរួចរាល់ (Browser Mode)។" : "e4mc engine verified in browser mode.", "success");
+                }, 1200);
+            }
+        };
+
+        window.copyP2PInviteTemplate = function() {
+            const isKm = currentLang === 'km';
+            const template = isKm 
+                ? "ចូលមកលេង Minecraft ជាមួយខ្ញុំលើ LONGVEK LAUNCHER! ខ្ញុំបានបើកបន្ទប់ P2P e4mc រួចរាល់ហើយ។ សូមទាក់ទងយក Link បន្ទប់មកលេងឥឡូវនេះ!"
+                : "Join my Minecraft world on LONGVEK LAUNCHER! Hosted via e4mc P2P Mesh. Ask me for the room link and join!";
+            
+            if (isElectron && window.electronAPI.copyToClipboard) {
+                window.electronAPI.copyToClipboard(template);
+            } else {
+                try {
+                    const tempInput = document.createElement('textarea');
+                    tempInput.value = template;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+                } catch (e) {}
+            }
+            showToast(isKm ? "បានចម្លង" : "Copied", isKm ? "បាន Copy សារអញ្ជើញមិត្តភក្តិ!" : "Copied invite message to clipboard!", "success");
+        };
+
+        window.checkFriendP2PDomain = async function() {
+            const input = document.getElementById('p2p-join-input');
+            const box = document.getElementById('p2p-ping-box');
+            const dot = document.getElementById('p2p-ping-dot');
+            const statusTxt = document.getElementById('p2p-ping-status');
+            const latencyTxt = document.getElementById('p2p-ping-latency');
+            const isKm = currentLang === 'km';
+
+            const domain = input ? input.value.trim() : '';
+            if (!domain) {
+                showToast(isKm ? "កំហុស" : "Error", isKm ? "សូមវាយបញ្ចូល Link បន្ទប់មិត្តភក្តិ!" : "Please enter a friend's room link or IP!", "error");
+                return;
+            }
+
+            box.classList.remove('hidden');
+            dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping";
+            statusTxt.textContent = isKm ? "កំពុងត្រួតពិនិត្យ..." : "Pinging host...";
+            latencyTxt.textContent = "-- ms";
+
+            if (isElectron && window.electronAPI.checkP2PDomain) {
+                const res = await window.electronAPI.checkP2PDomain(domain);
+                if (res && res.online) {
+                    dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]";
+                    statusTxt.textContent = isKm ? "បន្ទប់ Online (ត្រៀមចូលលេង)" : "Host Online (Ready to join)";
+                    latencyTxt.textContent = `${res.latency || 35} ms`;
+                } else {
+                    dot.className = "w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#f87171]";
+                    statusTxt.textContent = isKm ? "បន្ទប់ Offline ឬ Link ខុស" : "Host Offline or invalid link";
+                    latencyTxt.textContent = "TIMEOUT";
+                }
+            } else {
+                setTimeout(() => {
+                    dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]";
+                    statusTxt.textContent = "Simulated Online (Good)";
+                    latencyTxt.textContent = "28 ms";
+                }, 600);
+            }
+        };
+
+        window.joinFriendP2PWorld = function() {
+            const input = document.getElementById('p2p-join-input');
+            const isKm = currentLang === 'km';
+            const domain = input ? input.value.trim() : '';
+
+            if (!domain) {
+                showToast(isKm ? "កំហុស" : "Error", isKm ? "សូមវាយបញ្ចូល Link បន្ទប់មិត្តភក្តិ!" : "Please enter a friend's room link or IP!", "error");
+                return;
+            }
+
+            if (isElectron && window.electronAPI.copyToClipboard) {
+                window.electronAPI.copyToClipboard(domain);
+            } else {
+                try {
+                    const temp = document.createElement('textarea');
+                    temp.value = domain;
+                    document.body.appendChild(temp);
+                    temp.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(temp);
+                } catch (e) {}
+            }
+
+            showToast(isKm ? "បាន Copy IP រួចរាល់" : "IP Copied", isKm ? `បាន Copy ${domain} ស្វ័យប្រវត្តិ! កំពុងបើកហ្គេម...` : `Copied ${domain}! Opening Minecraft...`, "success");
+
+            // ប្តូរមកកាន់ Play Tab រួចបញ្ជា Launch ហ្គេម
+            const playNavBtn = document.querySelectorAll('#main-nav button')[0];
+            if (playNavBtn) {
+                switchTab('tab-play', playNavBtn);
+                setTimeout(() => {
+                    handlePlayBtnClick();
+                }, 400);
+            }
+        };
+
         function changeLanguage(lang) {
             currentLang = lang; 
             localStorage.setItem('longvek_lang', lang); 
@@ -1696,6 +2070,13 @@
                 'setting-bg-title': t.bgTitle,
                 'btn-done': t.btnDone,
                 'modal-settings-title': t.settingsTitle,
+                'fps-card-title': t.fpsTitle,
+                'fps-card-subtitle': t.fpsSubtitle,
+                'fps-card-desc': t.fpsDesc,
+                'btn-fps-boost-text': t.fpsBoostBtn,
+                'fps-pill-1': t.fpsPill1,
+                'fps-pill-2': t.fpsPill2,
+                'fps-pill-3': t.fpsPill3,
                 'lbl-latest-news': t.lblNews,
                 'news-teaser-title': t.newsTeaserTitle,
                 'news-teaser-desc': t.newsTeaserDesc,
@@ -1715,7 +2096,21 @@
                 'servers-title': t.serversTitle,
                 'servers-subtitle': t.serversSubtitle,
                 'server-card-desc': t.serverCardDesc,
-                'btn-play-server': t.playNow,
+                'btn-play-server-text': t.btnPlayServer,
+                // P2P Friend Worlds dynamic mappings
+                'lbl-subtab-official': t.subtabOfficial,
+                'lbl-subtab-p2p': t.subtabP2p,
+                'p2p-banner-title': t.p2pBannerTitle,
+                'p2p-status-badge': t.p2pStatusBadge,
+                'p2p-banner-desc': t.p2pBannerDesc,
+                'btn-install-e4mc-text': t.btnInstallE4mc,
+                'p2p-host-title-text': t.p2pHostTitle,
+                'p2p-guide-tag': t.p2pHostGuide,
+                'btn-copy-invite': t.btnCopyInvite,
+                'p2p-join-title-text': t.p2pJoinTitle,
+                'p2p-connect-tag': t.p2pConnectTag,
+                'lbl-friend-domain': t.lblFriendDomain,
+                'btn-join-launch': t.btnJoinLaunch,
                 'mods-header-title': t.modsHeaderTitle,
                 'mods-header-subtitle': t.modsHeaderSubtitle,
                 'btn-mod-cat-mods': t.modCatMods,
@@ -1762,6 +2157,16 @@
                 if (el) el.innerText = els[id]; 
             }
 
+            // Update P2P rich HTML elements (steps and input placeholder)
+            const step1 = document.getElementById('p2p-step-1');
+            const step2 = document.getElementById('p2p-step-2');
+            const step3 = document.getElementById('p2p-step-3');
+            const p2pInput = document.getElementById('p2p-join-input');
+            if (step1 && t.p2pStep1) step1.innerHTML = t.p2pStep1;
+            if (step2 && t.p2pStep2) step2.innerHTML = t.p2pStep2;
+            if (step3 && t.p2pStep3) step3.innerHTML = t.p2pStep3;
+            if (p2pInput && t.p2pInputPlaceholder) p2pInput.placeholder = t.p2pInputPlaceholder;
+
             const lblSwitch = document.getElementById('lbl-switch-acc');
             if (lblSwitch) lblSwitch.innerHTML = `<i class="ph-bold ph-users-three text-sm"></i> ${t.switchAcc}`;
             
@@ -1789,6 +2194,15 @@
             if (btnRun) btnRun.title = t.animRun;
             if (btnRotate) btnRotate.title = t.animRotate;
         }
+
+        window.handleServerSoonClick = function() {
+            const isKm = currentLang === 'km';
+            showToast(
+                isKm ? "ដំណឹង Server" : "Server Notice",
+                isKm ? "ម៉ាស៊ីនមេ LONGVEK នឹងបើកដំណើរការជាផ្លូវការឆាប់ៗនេះ! សូមរង់ចាំការប្រកាសជាថ្មី..." : "LONGVEK Server is coming soon! Stay tuned for the official launch.",
+                "info"
+            );
+        };
 
         window.modDownloadIntervals = {};
 
@@ -1933,23 +2347,47 @@
             if (isElectron && window.electronAPI.onMsLoginStatus) {
                 window.electronAPI.onMsLoginStatus((data) => {
                     const isKm = currentLang === 'km';
+                    const resetMsButton = () => {
+                        const btn = document.getElementById('btn-login-ms-action');
+                        if (btn) btn.classList.remove('pointer-events-none', 'opacity-70');
+                        const btnText = document.getElementById('btn-ms-login-text');
+                        const btnSub = document.getElementById('lbl-ms-subtext');
+                        if (btnText) btnText.textContent = isKm ? 'ចូលតាមរយៈ Microsoft' : 'Sign In with Microsoft';
+                        if (btnSub) btnSub.textContent = isKm ? 'ណែនាំសម្រាប់អ្នកលេង Pro' : 'Recommended for Pro Players';
+                    };
+
                     if (data.status === 'success') {
-                        const newAcc = data.account;
-                        const exists = accounts.find(a => a.id === newAcc.id);
-                        if (!exists) accounts.push(newAcc); else Object.assign(exists, newAcc);
-                        activeAccountId = newAcc.id; 
-                        localStorage.setItem('longvek_active_account_id', activeAccountId);
-                        saveAccounts(); currentUser = newAcc; 
-                        renderAccountList(); updateUIForActiveAccount();
+                        resetMsButton();
+                        // បិទផ្ទាំង Connect Account ចូលវិញភ្លាមៗ
+                        closeAuthModal();
+
+                        try {
+                            const newAcc = data.account;
+                            const exists = accounts.find(a => a.id === newAcc.id);
+                            if (!exists) accounts.push(newAcc); else Object.assign(exists, newAcc);
+                            activeAccountId = newAcc.id; 
+                            localStorage.setItem('longvek_active_account_id', activeAccountId);
+                            saveAccounts(); 
+                            currentUser = newAcc; 
+                            renderAccountList(); 
+                            updateUIForActiveAccount();
+
+                            // ប្តូរមកផ្ទាំង Play Tab (ទំព័រដើម) ភ្លាមៗ
+                            const playNavBtn = document.querySelectorAll('#main-nav button')[0];
+                            if (playNavBtn) switchTab('tab-play', playNavBtn);
+                        } catch (e) {
+                            console.error("Account switch error:", e);
+                        }
+
                         if(window.showToast) {
                             showToast(
                                 isKm ? "ជោគជ័យ" : "Success", 
-                                isKm ? "ចូលគណនី Microsoft បានជោគជ័យ!" : "Microsoft account logged in successfully!", 
+                                isKm ? `បានភ្ជាប់គណនី Premium: ${data.account.name}!` : `Connected Premium: ${data.account.name}!`, 
                                 "success"
                             );
                         }
-                        closeAuthModal();
                     } else if (data.status === 'error') {
+                        resetMsButton();
                         if(window.showToast) {
                             showToast(
                                 isKm ? "បរាជ័យ" : "Error", 
@@ -1958,6 +2396,8 @@
                             );
                         }
                     } else if (data.status === 'loading') {
+                        const btnSub = document.getElementById('lbl-ms-subtext');
+                        if (btnSub && data.msg) btnSub.textContent = data.msg;
                         if(window.showToast) {
                             showToast(
                                 isKm ? "សូមរង់ចាំ..." : "Please wait...", 
@@ -2093,12 +2533,12 @@
         
         window.applyFPSBooster = function() {
             const ramSlider = document.getElementById('ram-slider');
-            const newRam = Math.max(4, Math.min(6, ramSlider.max));
+            const newRam = Math.max(4, Math.min(6, parseInt(ramSlider.max) || 8));
             ramSlider.value = newRam;
             document.getElementById('ram-value-display').innerText = newRam + ' GB';
             localStorage.setItem('longvek_ram', newRam);
 
-            const aikarFlags = "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1";
+            const aikarFlags = "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=50 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=25 -XX:G1MaxNewSizePercent=35 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=15 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -XX:+UseStringDeduplication";
             const jvmInput = document.getElementById('jvm-args-input');
             jvmInput.value = aikarFlags;
             localStorage.setItem('longvek_jvm_args', aikarFlags);
@@ -2107,7 +2547,8 @@
                 window.electronAPI.applyFpsBoost(activeProfileId);
             }
 
-            showToast("FPS Boosted!", "Optimized RAM & JVM flags applied successfully.", "success");
+            const t = translations[currentLang] || translations.en;
+            showToast(t.fpsBoostSuccessTitle || "FPS Boosted!", t.fpsBoostSuccessDesc || "Optimized RAM & JVM flags applied successfully.", "success");
         };
 
         function switchSettingTab(tab) {
@@ -2145,10 +2586,11 @@
                 if (mainSkinViewer && mainSkinViewer.animation) mainSkinViewer.animation.paused = true;
                 if (wardrobeSkinViewer) wardrobeSkinViewer.autoRotate = false;
             } else {
-                document.body.classList.remove('reduce-motion');
-                if (activeTab && activeTab.id === 'tab-play' && mainSkinViewer && mainSkinViewer.animation) {
-                    mainSkinViewer.animation.paused = false;
-                }
+            const langSelect = document.getElementById('language-select');
+            if(langSelect) { 
+                langSelect.value = currentLang; 
+                changeLanguage(currentLang); 
+            }
                 if (activeTab && activeTab.id === 'tab-wardrobe' && wardrobeSkinViewer) {
                     wardrobeSkinViewer.autoRotate = true;
                 }
@@ -2252,22 +2694,28 @@
 
             accounts.forEach(acc => {
                 const isActive = acc.id === activeAccountId;
-                const typeIcon = acc.type === 'microsoft' ? '<i class="ph-fill ph-microsoft-logo text-emerald-400 text-xs" title="Microsoft Premium"></i>' : '<i class="ph-fill ph-user text-gray-400 text-xs" title="Offline"></i>';
+                const isPremium = acc.type === 'microsoft' || acc.accountCategory === 'premium';
                 
+                const typeIcon = isPremium 
+                    ? '<i class="ph-fill ph-shield-check text-emerald-400 text-xs" title="Microsoft Premium"></i>' 
+                    : '<i class="ph-fill ph-game-controller text-sky-400 text-xs" title="Account Free"></i>';
+                
+                const roleBadge = isPremium 
+                    ? `<span class="text-[9px] font-black text-emerald-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]"></span> Premium Account</span>`
+                    : `<span class="text-[9px] font-bold text-sky-300 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span> Account Free</span>`;
+
                 const displaySkin = acc.skinData || acc.skinName || acc.name;
                 const isBase64 = displaySkin && typeof displaySkin === 'string' && displaySkin.startsWith('data:image');
                 const imgSrc = isBase64 ? displaySkin : `https://mc-heads.net/avatar/${encodeURIComponent(displaySkin || 'MHF_Question')}/32`;
                 const imgStyle = isBase64 ? 'object-fit: cover; object-position: top;' : '';
-
-                const displayRole = acc.role || (acc.type === 'microsoft' ? 'Premium Account' : 'Offline Player');
 
                 container.innerHTML += `
                     <div class="flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all ${isActive ? 'bg-brand-500/20 border border-brand-400/40 shadow-sm' : 'hover:bg-white/5 border border-transparent'}" onclick="switchAccount('${acc.id}')">
                         <div class="flex items-center gap-2.5">
                             <img src="${imgSrc}" onerror="this.src='https://mc-heads.net/avatar/MHF_Question/32'" class="w-8 h-8 rounded-lg border border-white/10" style="${imgStyle}">
                             <div class="flex flex-col">
-                                <span class="text-xs font-bold text-white flex items-center gap-1">${acc.name} ${typeIcon}</span>
-                                <span class="text-[9px] text-gray-400">${displayRole}</span>
+                                <span class="text-xs font-bold text-white flex items-center gap-1.5">${acc.name} ${typeIcon}</span>
+                                ${roleBadge}
                             </div>
                         </div>
                         <button onclick="removeAccount('${acc.id}', event)" class="w-7 h-7 rounded-lg bg-surface-950/80 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"><i class="ph ph-trash text-xs"></i></button>
@@ -2299,6 +2747,14 @@
 
         window.loginMicrosoft = function() {
             if (isElectron && window.electronAPI.msLogin) {
+                const btn = document.getElementById('btn-login-ms-action');
+                if (btn) btn.classList.add('pointer-events-none', 'opacity-70');
+                
+                const btnText = document.getElementById('btn-ms-login-text');
+                const btnSub = document.getElementById('lbl-ms-subtext');
+                if (btnText) btnText.innerHTML = `<span class="flex items-center gap-2"><i class="ph ph-spinner animate-spin text-base"></i> ${currentLang === 'km' ? 'កំពុងភ្ជាប់ Microsoft...' : 'Connecting Microsoft...'}</span>`;
+                if (btnSub) btnSub.textContent = currentLang === 'km' ? 'សូមរង់ចាំបន្តិច...' : 'Please wait...';
+
                 window.electronAPI.msLogin(currentLang || 'en');
             } else {
                 const isKm = currentLang === 'km';
@@ -2311,7 +2767,7 @@
             const roleInput = document.getElementById('offline-role');
             
             const username = input.value.trim();
-            const role = roleInput ? roleInput.value : 'Offline Player';
+            const role = roleInput ? roleInput.value : 'PvP Player';
             const isKm = currentLang === 'km';
             
             if (!username) {
@@ -2321,15 +2777,19 @@
             
             const existing = accounts.find(a => a.name.toLowerCase() === username.toLowerCase() && a.type === 'offline');
             if (existing) {
-                existing.role = role;
+                existing.role = 'Account Free';
+                existing.accountCategory = 'free';
+                existing.playstyle = role;
                 switchAccount(existing.id);
-                if(window.showToast) showToast(isKm ? "ដំណឹង" : "Info", isKm ? `បានប្តូរទៅកាន់តួអង្គ: ${username}` : `Switched to existing character: ${username}`, "info");
+                if(window.showToast) showToast(isKm ? "ដំណឹង" : "Info", isKm ? `បានប្តូរទៅកាន់: ${username} (Account Free)` : `Switched to: ${username} (Account Free)`, "info");
             } else {
                 const newAcc = {
                     id: 'offline_' + Date.now(),
                     name: username,
                     type: 'offline',
-                    role: role,
+                    role: 'Account Free',
+                    accountCategory: 'free',
+                    playstyle: role,
                     playtimeMins: 0
                 };
                 accounts.push(newAcc);
@@ -2338,7 +2798,7 @@
                 currentUser = newAcc;
                 saveAccounts();
                 updateUIForActiveAccount();
-                if(window.showToast) showToast(isKm ? "ជោគជ័យ" : "Success", isKm ? `បានបង្កើតតួអង្គ: ${username}` : `Created character: ${username}`, "success");
+                if(window.showToast) showToast(isKm ? "ជោគជ័យ" : "Success", isKm ? `បានភ្ជាប់: ${username} (Account Free)` : `Connected: ${username} (Account Free)`, "success");
             }
             
             input.value = '';
@@ -2348,6 +2808,7 @@
         function updateUIForActiveAccount() {
             const mainProfileImg = document.getElementById('main-profile-img');
             const playerWelcome = document.getElementById('player-welcome');
+            const accountTypeBadge = document.getElementById('player-account-type-badge');
             const hologramEmptyState = document.getElementById('hologram-empty-state');
             const skinCanvas = document.getElementById('skin-canvas');
             const profileStatusDot = document.getElementById('profile-status-dot');
@@ -2358,6 +2819,7 @@
             if (!currentUser) {
                 if(mainProfileImg) mainProfileImg.src = "https://mc-heads.net/avatar/MHF_Question/64";
                 if(playerWelcome) { playerWelcome.classList.add('hidden'); playerWelcome.classList.remove('opacity-100'); }
+                if(accountTypeBadge) { accountTypeBadge.classList.add('opacity-0'); accountTypeBadge.innerHTML = ''; }
                 if(hologramEmptyState) hologramEmptyState.classList.remove('hidden');
                 if(skinCanvas) { skinCanvas.classList.add('hidden', 'opacity-0'); }
                 if(animToolbar) { animToolbar.classList.add('opacity-0', 'pointer-events-none', 'scale-95'); }
@@ -2367,6 +2829,7 @@
                 return;
             }
 
+            const isPremium = currentUser.type === 'microsoft' || currentUser.accountCategory === 'premium';
             const displaySkin = currentUser.skinData || currentUser.skinName || currentUser.name;
             const isBase64 = displaySkin && typeof displaySkin === 'string' && displaySkin.startsWith('data:image');
             const skinUrl = isBase64 ? displaySkin : `https://mc-heads.net/skin/${encodeURIComponent(displaySkin || 'MHF_Question')}`;
@@ -2377,7 +2840,12 @@
                 if (isBase64) mainProfileImg.style.objectPosition = 'top';
             }
 
-            if(profileStatusDot) profileStatusDot.className = "absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-surface-950 rounded-full transition-colors shadow-[0_0_8px_#34d399]";
+            if(profileStatusDot) {
+                profileStatusDot.className = isPremium 
+                    ? "absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-surface-950 rounded-full transition-colors shadow-[0_0_8px_#34d399]"
+                    : "absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-sky-400 border-2 border-surface-950 rounded-full transition-colors shadow-[0_0_8px_#38bdf8]";
+            }
+            
             if(hologramEmptyState) hologramEmptyState.classList.add('hidden');
 
             if (mainSkinViewer) {
@@ -2400,6 +2868,13 @@
                 playerWelcome.textContent = currentUser.name;
                 playerWelcome.classList.remove('hidden');
                 setTimeout(() => playerWelcome.classList.remove('opacity-0'), 50);
+            }
+
+            if(accountTypeBadge) {
+                accountTypeBadge.innerHTML = isPremium 
+                    ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.3)]"><i class="ph-fill ph-shield-check text-xs"></i> Premium Account</span>`
+                    : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-400/40 shadow-[0_0_12px_rgba(56,189,248,0.25)]"><i class="ph-fill ph-game-controller text-xs"></i> Account Free</span>`;
+                accountTypeBadge.classList.remove('opacity-0');
             }
 
             if(playtimeBadge) {

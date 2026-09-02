@@ -92,6 +92,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openProfileFolder: (profileId) => ipcRenderer.send('open-profile-folder', profileId),
     applyFpsBoost: (profileId) => ipcRenderer.send('apply-fps-boost', profileId),
 
+    // --- P2P Friend Worlds (e4mc / Essential Integration) ---
+    checkP2PDomain: (domain) => ipcRenderer.invoke('check-p2p-domain', domain),
+    installE4mcMod: (profileId, version, loader) => ipcRenderer.invoke('install-e4mc-mod', { profileId, version, loader }),
+    copyToClipboard: (text) => ipcRenderer.send('copy-to-clipboard', text),
+
     // --- Bug Report & Feedback Submission ---
     submitBugReport: (reportData) => ipcRenderer.invoke('submit-bug-report', reportData)
 });
