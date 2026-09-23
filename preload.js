@@ -5,6 +5,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     minimizeWindow: () => ipcRenderer.send('minimize-window'),
     maximizeWindow: () => ipcRenderer.send('maximize-window'),
     closeWindow: () => ipcRenderer.send('close-window'),
+    onWindowState: (callback) => {
+        ipcRenderer.removeAllListeners('window-state');
+        ipcRenderer.on('window-state', (_event, state) => callback(state));
+    },
 
     // --- Splash Screen & Startup Listener ---
     onSplashUpdateStatus: (callback) => {
@@ -22,6 +26,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // --- Version Management ---
     getLocalVersions: () => ipcRenderer.invoke('get-local-versions'),
+    getAvailableVersions: (releaseOnly) => ipcRenderer.invoke('get-available-versions', releaseOnly),
+    getFabricLoaders: (gameVersion) => ipcRenderer.invoke('get-fabric-loaders', gameVersion),
+    installVersionEngine: (options) => ipcRenderer.invoke('install-version-engine', options),
 
     // --- Game Launching & Controls ---
     launchGame: (options) => ipcRenderer.send('launch-game', options),
@@ -39,6 +46,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onLauncherProgress: (callback) => {
         ipcRenderer.removeAllListeners('launcher-progress');
         ipcRenderer.on('launcher-progress', (_event, data) => callback(data));
+    },
+    onSessionExpiredNotice: (callback) => {
+        ipcRenderer.removeAllListeners('session-expired-notice');
+        ipcRenderer.on('session-expired-notice', (_event, data) => callback(data));
+    },
+    onSessionExpiredRelogin: (callback) => {
+        ipcRenderer.removeAllListeners('session-expired-relogin');
+        ipcRenderer.on('session-expired-relogin', (_event, data) => callback(data));
+    },
+    onAccountTokenRefreshed: (callback) => {
+        ipcRenderer.removeAllListeners('account-token-refreshed');
+        ipcRenderer.on('account-token-refreshed', (_event, data) => callback(data));
+    },
+    onGameCrashed: (callback) => {
+        ipcRenderer.removeAllListeners('game-crashed');
+        ipcRenderer.on('game-crashed', (_event, analysis) => callback(analysis));
     },
     onGameClosed: (callback) => {
         ipcRenderer.removeAllListeners('game-closed');
@@ -72,25 +95,50 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // --- Discord Rich Presence (RPC) ---
     toggleDiscordRPC: (enable) => ipcRenderer.send('toggle-discord-rpc', enable),
-    updateDiscordRPC: (state, details) => ipcRenderer.send('update-discord-rpc', { state, details }),
+    updateDiscordRPC: (details, state) => ipcRenderer.send('update-discord-rpc', { details, state }),
 
     // --- Content Manager (Mods, Resource Packs, Shaders) ---
-    getInstalledContent: () => ipcRenderer.invoke('get-installed-content'),
+    getInstalledContent: (profileId) => ipcRenderer.invoke('get-installed-content', profileId),
     installMod: (data) => ipcRenderer.send('install-mod', data),
     onModInstalled: (callback) => {
         ipcRenderer.removeAllListeners('mod-installed');
         ipcRenderer.on('mod-installed', (_event, modName) => callback(modName));
     },
-    deleteContentFile: (category, fileName) => ipcRenderer.invoke('delete-content-file', { category, fileName }),
+    deleteContentFile: (category, fileName, profileId) => ipcRenderer.invoke('delete-content-file', { category, fileName, profileId }),
     deleteMod: (modData) => ipcRenderer.send('delete-mod', modData),
-    toggleContentFile: (category, fileName, enable) => ipcRenderer.invoke('toggle-content-file', { category, fileName, enable }),
+    toggleContentFile: (category, fileName, enable, profileId) => ipcRenderer.invoke('toggle-content-file', { category, fileName, enable, profileId }),
     toggleMod: (data) => ipcRenderer.send('toggle-mod', data),
-    addCustomContentFiles: (category) => ipcRenderer.invoke('add-custom-content-files', category),
+    addCustomContentFiles: (category, profileId) => ipcRenderer.invoke('add-custom-content-files', { category, profileId }),
 
     // --- Folder Navigation & Optimization ---
-    openGameFolder: (subFolder) => ipcRenderer.send('open-game-folder', subFolder),
+    openGameFolder: (subFolder, profileId) => ipcRenderer.send('open-game-folder', subFolder, profileId),
     openProfileFolder: (profileId) => ipcRenderer.send('open-profile-folder', profileId),
     applyFpsBoost: (profileId) => ipcRenderer.send('apply-fps-boost', profileId),
+
+    // --- LOW-END PC BOOST PACK & AUTO-DOCTOR APIS ---
+    installFpsPack: (data) => ipcRenderer.invoke('install-fps-pack', data),
+    autoFixCrash: (data) => ipcRenderer.invoke('auto-fix-crash', data),
+    cleanMemory: () => ipcRenderer.invoke('clean-memory'),
+
+    // --- Modpack Import & Mod Counter APIs ---
+    getProfileModCount: (profileId) => ipcRenderer.invoke('get-profile-mod-count', profileId),
+    importModpackFile: (filePath) => ipcRenderer.invoke('import-modpack-file', filePath),
+    onModpackImportProgress: (callback) => {
+        ipcRenderer.removeAllListeners('modpack-import-progress');
+        ipcRenderer.on('modpack-import-progress', (_event, data) => callback(data));
+    },
+
+    // --- Screenshots Gallery Manager APIs ---
+    getScreenshots: (profileId) => ipcRenderer.invoke('get-screenshots', profileId),
+    deleteScreenshot: (filePath) => ipcRenderer.invoke('delete-screenshot', filePath),
+    copyScreenshotImage: (filePath) => ipcRenderer.invoke('copy-screenshot-image', filePath),
+    openScreenshotFolder: (profileId) => ipcRenderer.send('open-screenshot-folder', profileId),
+
+    // --- In-Game Cyber HUD Test Action ---
+    testOverlay: (data) => ipcRenderer.send('test-overlay', data),
+
+    // --- High-Performance Texture & Image Base64 Fetcher ---
+    fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url),
 
     // --- P2P Friend Worlds (e4mc / Essential Integration) ---
     checkP2PDomain: (domain) => ipcRenderer.invoke('check-p2p-domain', domain),

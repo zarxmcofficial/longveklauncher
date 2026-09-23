@@ -1,0 +1,62 @@
+{
+"appId": "com.longvek.launcher",
+"productName": "LONGVEK Launcher",
+"copyright": "Copyright © 2026 LONGVEK Network",
+"directories": {
+"output": "dist",
+"buildResources": "build"
+},
+"files": [
+"main.js",
+"preload.js",
+"index.html",
+"LONGVEKLAUNCHER.ico",
+"package.json",
+"node_modules//*"
+],
+"asar": true,
+"win": {
+"target": [
+{
+"target": "nsis",
+"arch": [
+"x64"
+]
+}
+],
+"icon": "LONGVEKLAUNCHER.ico",
+"requestedExecutionLevel": "asInvoker",
+"legalTrademarks": "LONGVEK Network",
+"publisherName": "LONGVEK Network"
+},
+"nsis": {
+"oneClick": false,
+"perMachine": false,
+"allowElevation": true,
+"allowToChangeInstallationDirectory": true,
+"installerIcon": "LONGVEKLAUNCHER.ico",
+"uninstallerIcon": "LONGVEKLAUNCHER.ico",
+"createDesktopShortcut": true,
+"createStartMenuShortcut": true,
+"shortcutName": "LONGVEK Launcher",
+"uninstallDisplayName": "LONGVEK Launcher",
+"runAfterFinish": true,
+"displayLanguageSelector": false,
+"include": "build/installer.nsh"
+},
+"linux": {
+"target": [
+"AppImage",
+"deb"
+],
+"category": "Game",
+"icon": "LONGVEKLAUNCHER.ico",
+"synopsis": "High Performance Minecraft Client Launcher",
+"description": "LONGVEK Launcher - Optimized Minecraft Client Engine with In-Game Cyber HUD, Cape Synchronization, and P2P Friends Worlds for Linux.",
+"maintainer": "LONGVEK Network support@longvek.client",
+"desktop": {
+"StartupNotify": "true",
+"Encoding": "UTF-8"
+}
+}
+}

@@ -1,19 +1,914 @@
-const { app, BrowserWindow, ipcMain, shell, session, dialog, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, dialog, clipboard, globalShortcut, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const net = require('net');
+const crypto = require('crypto');
 const axios = require('axios');
 const extract = require('extract-zip');
+const archiver = require('archiver');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const msmc = require('msmc');
-const DiscordRPC = require('discord-rpc');
 const { autoUpdater } = require('electron-updater');
 
 // បិទ HTTP Cache របស់ Chromium ដើម្បីធានាថាទាញយក UI index.html ថ្មីជានិច្ច
 app.commandLine.appendSwitch('disable-http-cache');
+// អនុញ្ញាតឱ្យប្រើប្រាស់ Garbage Collection សម្រាប់សម្អាត RAM
+app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
-// ការពារកុំឱ្យបើក Launcher ជាន់គ្នាពីរ ដែលនាំឱ្យកើត Access is denied (0x5)
+let mainWindow = null;
+let splashWindow = null;
+let rpcClient = null;
+let rpcEnabled = true;
+let isLaunchAborted = false;
+
+const launcher = new Client();
+
+// កំណត់ Directory ស្តង់ដាររបស់ LONGVEK Launcher
+const rootPath = process.platform === 'win32'
+    ? path.join(app.getPath('appData'), '.longvek')
+    : path.join(os.homedir(), '.longvek');
+
+const runtimesDir = path.join(rootPath, 'runtimes');
+const versionsDir = path.join(rootPath, 'versions');
+const librariesDir = path.join(rootPath, 'libraries');
+const assetsDir = path.join(rootPath, 'assets');
+const indexesDir = path.join(assetsDir, 'indexes');
+const objectsDir = path.join(assetsDir, 'objects');
+const instancesDir = path.join(rootPath, 'instances');
+
+[rootPath, runtimesDir, versionsDir, librariesDir, assetsDir, indexesDir, objectsDir, instancesDir].forEach(d => {
+    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+});
+
+// =========================================================================
+// 1. DYNAMIC MINECRAFT CORE ENGINE (MOJANG V2 & FABRIC META APIS)
+// =========================================================================
+
+const MOJANG_MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
+const FABRIC_META_URL = 'https://meta.fabricmc.net/v2/versions/loader';
+
+class MinecraftCoreEngine {
+    constructor() {
+        this.http = axios.create({
+            timeout: 25000,
+            headers: { 'User-Agent': 'LONGVEK-Launcher-Engine/3.0' }
+        });
+    }
+
+    verifyFile(filePath, expectedSha1 = null, expectedSize = null) {
+        if (!fs.existsSync(filePath)) return false;
+        try {
+            const stat = fs.statSync(filePath);
+            if (stat.size <= 0) return false;
+            if (expectedSize !== null && stat.size !== expectedSize) return false;
+
+            if (expectedSha1) {
+                const data = fs.readFileSync(filePath);
+                const hash = crypto.createHash('sha1').update(data).digest('hex').toLowerCase();
+                return hash === expectedSha1.toLowerCase();
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async downloadFileSafe(url, destPath, expectedSha1 = null, expectedSize = null) {
+        if (this.verifyFile(destPath, expectedSha1, expectedSize)) {
+            return true;
+        }
+
+        const dir = path.dirname(destPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+        const tempPath = destPath + '.tmp';
+        try {
+            const response = await this.http.get(url, { responseType: 'stream' });
+            const writer = fs.createWriteStream(tempPath);
+
+            await new Promise((resolve, reject) => {
+                response.data.pipe(writer);
+                let err = null;
+                writer.on('error', e => { err = e; writer.close(); reject(e); });
+                writer.on('close', () => { if (!err) resolve(true); });
+            });
+
+            if (!this.verifyFile(tempPath, expectedSha1, expectedSize)) {
+                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+                return false;
+            }
+
+            if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+            fs.renameSync(tempPath, destPath);
+            return true;
+        } catch (err) {
+            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+            console.warn(`[Download Error]: ${path.basename(destPath)}: ${err.message}`);
+            return false;
+        }
+    }
+
+    async fetchVanillaVersions(releaseOnly = true) {
+        try {
+            const res = await this.http.get(MOJANG_MANIFEST_URL);
+            let versions = res.data?.versions || [];
+            if (releaseOnly) {
+                versions = versions.filter(v => v.type === 'release');
+            }
+            return versions;
+        } catch (err) {
+            console.error('[Mojang API Error]:', err.message);
+            return [];
+        }
+    }
+
+    async fetchFabricLoaders(gameVersion) {
+        try {
+            const res = await this.http.get(`${FABRIC_META_URL}/${gameVersion}`);
+            return Array.isArray(res.data) ? res.data : [];
+        } catch (err) {
+            console.error('[Fabric API Error]:', err.message);
+            return [];
+        }
+    }
+
+    async setupFabricProfile(gameVersion) {
+        const loaders = await this.fetchFabricLoaders(gameVersion);
+        if (loaders.length === 0) return null;
+
+        const loaderVersion = loaders[0]?.loader?.version;
+        const profileId = `fabric-loader-${loaderVersion}-${gameVersion}`;
+        const targetDir = path.join(versionsDir, profileId);
+        const targetJson = path.join(targetDir, `${profileId}.json`);
+
+        if (fs.existsSync(targetJson)) {
+            return profileId;
+        }
+
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+        const profileUrl = `${FABRIC_META_URL}/${gameVersion}/${loaderVersion}/profile/json`;
+
+        sendLogToUI(`Downloading Fabric Profile JSON: ${profileId}...`, 'info');
+        const ok = await this.downloadFileSafe(profileUrl, targetJson);
+        if (ok) {
+            sendLogToUI(`Fabric Profile installed successfully!`, 'success');
+            return profileId;
+        }
+        return null;
+    }
+}
+
+const mcEngine = new MinecraftCoreEngine();
+
+// =========================================================================
+// AUTO RAM CLEANUP ENGINE (SAFE IN-PROCESS MEMORY OPTIMIZATION)
+// =========================================================================
+function performRamCleanup() {
+    try {
+        if (global.gc) {
+            global.gc();
+        }
+        console.log('[RAM Cleanup]: Optimized internal memory cache safely.');
+    } catch (e) {
+        console.warn('[RAM Cleanup Note]: Enable --expose-gc flag for full memory cleanup. ', e.message);
+    }
+}
+
+// =========================================================================
+// ESSENTIAL HELPER FUNCTIONS (DIRECTORY, NETWORK & FABRIC PROFILE ENGINE)
+// =========================================================================
+
+function sendLogToUI(message, type = 'info') {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('launcher-log', { message, type });
+    }
+}
+
+function getInstanceDir(profileId) {
+    const pId = (profileId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dir = path.join(rootPath, 'instances', pId);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+}
+
+function getInstanceContentDir(profileId, category) {
+    const instDir = getInstanceDir(profileId);
+    let sub = 'mods';
+    const cat = (category || '').toLowerCase();
+    if (cat.includes('resource')) sub = 'resourcepacks';
+    else if (cat.includes('shader')) sub = 'shaderpacks';
+    else sub = 'mods';
+    const target = path.join(instDir, sub);
+    if (!fs.existsSync(target)) fs.mkdirSync(target, { recursive: true });
+    return target;
+}
+
+function sanitizeInstanceMods(instanceDir, mcVersion) {
+    try {
+        const instModsDir = path.join(instanceDir, 'mods');
+        if (!fs.existsSync(instModsDir)) return;
+        const files = fs.readdirSync(instModsDir);
+        for (const file of files) {
+            if (file.endsWith('.jar') || file.endsWith('.zip') || file.endsWith('.jar.disabled')) {
+                const filePath = path.join(instModsDir, file);
+                const stat = fs.statSync(filePath);
+                if (stat.size < 1024) {
+                    fs.unlinkSync(filePath);
+                    console.log(`[Sanitizer] Deleted corrupted/empty file: ${file}`);
+                    continue;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('[Sanitizer Notice]:', e.message);
+    }
+}
+
+function ensureLongvekInGameConfig(instanceDir, username = 'Player') {
+    try {
+        const configDir = path.join(instanceDir, 'config');
+        if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+
+        const hudConfigs = ['longvek-hud.json', 'kronhud.json', 'simplehud.json'];
+        const hudPayload = {
+            clientName: "LONGVEK CLIENT",
+            clientVersion: "v2.5 PRO",
+            theme: {
+                primaryColor: "#38bdf8",
+                secondaryColor: "#0ea5e9",
+                backgroundColor: "rgba(11, 19, 41, 0.75)",
+                textColor: "#ffffff",
+                accentColor: "#38bdf8",
+                glow: true,
+                roundedCorners: true,
+                borderWidth: 1.5,
+                borderColor: "rgba(56, 189, 248, 0.45)"
+            },
+            modules: {
+                watermark: { enabled: true, text: "LONGVEK CLIENT v2.5", x: 6, y: 6, color: "#38bdf8" },
+                fps: { enabled: true, showLabel: true, x: 6, y: 22, color: "#ffffff" },
+                ping: { enabled: true, showLabel: true, x: 6, y: 36, color: "#34d399" },
+                cps: { enabled: true, showBoth: true, x: 6, y: 50, color: "#38bdf8" },
+                keystrokes: {
+                    enabled: true,
+                    showMouseButtons: true,
+                    showSpacebar: true,
+                    x: 6,
+                    y: 70,
+                    keyColor: "rgba(255, 255, 255, 0.85)",
+                    activeKeyColor: "#38bdf8",
+                    keyBackground: "rgba(11, 19, 41, 0.8)"
+                },
+                coordinates: { enabled: true, showBiome: true, x: 6, y: 160 },
+                armorStatus: { enabled: true, horizontal: false, x: -30, y: -80 }
+            },
+            keybinds: {
+                menuToggle: "RIGHT_SHIFT",
+                hudToggle: "F8"
+            }
+        };
+
+        hudConfigs.forEach(cfgName => {
+            const cfgPath = path.join(configDir, cfgName);
+            try {
+                fs.writeFileSync(cfgPath, JSON.stringify(hudPayload, null, 2), 'utf8');
+            } catch (e) {}
+        });
+
+        const modMenuPath = path.join(configDir, 'modmenu.json');
+        const modMenuConfig = {
+            badge_mods: true,
+            modify_title_screen: true,
+            mods_button_style: "replace_realms",
+            show_libraries: false
+        };
+        try {
+            fs.writeFileSync(modMenuPath, JSON.stringify(modMenuConfig, null, 2), 'utf8');
+        } catch (e) {}
+
+        const optionsTxtPath = path.join(instanceDir, 'options.txt');
+        let optionsMap = new Map();
+
+        if (fs.existsSync(optionsTxtPath)) {
+            const rawContent = fs.readFileSync(optionsTxtPath, 'utf8');
+            rawContent.split(/\r?\n/).forEach(line => {
+                const idx = line.indexOf(':');
+                if (idx > 0) {
+                    const k = line.substring(0, idx).trim();
+                    const v = line.substring(idx + 1).trim();
+                    optionsMap.set(k, v);
+                }
+            });
+        }
+
+        optionsMap.set('gamma', '1000.0');
+        optionsMap.set('autoJump', 'false');
+        optionsMap.set('fov', optionsMap.get('fov') || '85.0');
+        optionsMap.set('key_key.modmenu.open', 'key.keyboard.right.shift');
+        optionsMap.set('key_key.kronhud.open', 'key.keyboard.right.shift');
+        optionsMap.set('key_key.hud.menu', 'key.keyboard.right.shift');
+
+        let optionsLines = [];
+        for (const [k, v] of optionsMap.entries()) {
+            optionsLines.push(`${k}:${v}`);
+        }
+        fs.writeFileSync(optionsTxtPath, optionsLines.join('\n'), 'utf8');
+        console.log(`[Config Engine]: Automatically generated LONGVEK HUD & PvP options for ${username}!`);
+    } catch (err) {
+        console.warn('[Config Engine Warning]:', err.message);
+    }
+}
+
+async function downloadFile(url, destPath, label = 'File') {
+    const tempPath = destPath + '.tmp';
+    const writer = fs.createWriteStream(tempPath);
+    try {
+        const response = await axios({
+            url,
+            method: 'GET',
+            responseType: 'stream',
+            timeout: 30000,
+            headers: { 'User-Agent': 'LONGVEK-Client-Downloader/2.5' }
+        });
+
+        await new Promise((resolve, reject) => {
+            response.data.pipe(writer);
+            let error = null;
+            writer.on('error', err => { error = err; writer.close(); reject(err); });
+            writer.on('close', () => { if (!error) resolve(true); });
+        });
+
+        const stat = fs.statSync(tempPath);
+        if (stat.size > 1024) {
+            if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+            fs.renameSync(tempPath, destPath);
+            return true;
+        } else {
+            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+            throw new Error('Downloaded file is empty or corrupted.');
+        }
+    } catch (error) {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        throw error;
+    }
+}
+
+async function ensureFabricProfile(mcVersion) {
+    try {
+        const versionsDir = path.join(rootPath, 'versions');
+        if (!fs.existsSync(versionsDir)) fs.mkdirSync(versionsDir, { recursive: true });
+
+        const metaUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}`;
+        const metaRes = await axios.get(metaUrl, { timeout: 8000 });
+        if (!Array.isArray(metaRes.data) || metaRes.data.length === 0) {
+            sendLogToUI(`Fabric meta not available for ${mcVersion}, continuing with release version.`, 'warning');
+            return null;
+        }
+
+        const loaderVersion = metaRes.data[0].loader.version;
+        const fabricProfileId = `fabric-loader-${loaderVersion}-${mcVersion}`;
+        const targetVersionDir = path.join(versionsDir, fabricProfileId);
+        const targetJson = path.join(targetVersionDir, `${fabricProfileId}.json`);
+
+        if (fs.existsSync(targetJson)) return fabricProfileId;
+
+        sendLogToUI(`Setting up Fabric Profile: ${fabricProfileId}...`, 'info');
+        if (!fs.existsSync(targetVersionDir)) fs.mkdirSync(targetVersionDir, { recursive: true });
+
+        const profileJsonUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
+        const profileRes = await axios.get(profileJsonUrl, { timeout: 10000 });
+        fs.writeFileSync(targetJson, JSON.stringify(profileRes.data, null, 2), 'utf8');
+
+        sendLogToUI(`Fabric Profile installed successfully!`, 'success');
+        return fabricProfileId;
+    } catch (err) {
+        console.warn('Fabric Profile setup error:', err.message);
+        return null;
+    }
+}
+
+async function ensureFabricAPI(instanceDir, mcVersion) {
+    try {
+        const instModsDir = path.join(instanceDir, 'mods');
+        if (!fs.existsSync(instModsDir)) fs.mkdirSync(instModsDir, { recursive: true });
+
+        const files = fs.readdirSync(instModsDir);
+        const hasFabricApi = files.some(f => f.toLowerCase().includes('fabric-api') && !f.endsWith('.disabled'));
+        if (hasFabricApi) return true;
+
+        sendLogToUI(`[Fabric API Engine]: Auto-downloading Fabric API from Modrinth...`, 'info');
+        const apiUrl = 'https://api.modrinth.com/v2/project/fabric-api/version';
+        const res = await axios.get(apiUrl, {
+            params: {
+                game_versions: JSON.stringify([mcVersion]),
+                loaders: JSON.stringify(['fabric'])
+            },
+            timeout: 8000,
+            headers: { 'User-Agent': 'LONGVEK-Client-Launcher/2.5' }
+        });
+        if (Array.isArray(res.data) && res.data.length > 0 && res.data[0].files && res.data[0].files.length > 0) {
+            const file = res.data[0].files[0];
+            const destPath = path.join(instModsDir, file.filename);
+            await downloadFile(file.url, destPath, 'Fabric API');
+            sendLogToUI(`[Fabric API Engine]: Fabric API successfully installed!`, 'success');
+            return true;
+        }
+    } catch (e) {
+        console.warn('Fabric API auto-download skipped:', e.message);
+    }
+    return false;
+}
+
+async function ensureInGameHudMod(instanceDir, mcVersion, loader = 'fabric') {
+    try {
+        const instModsDir = path.join(instanceDir, 'mods');
+        if (!fs.existsSync(instModsDir)) fs.mkdirSync(instModsDir, { recursive: true });
+
+        const files = fs.readdirSync(instModsDir);
+        const hasHudMod = files.some(f => {
+            const low = f.toLowerCase();
+            return (low.includes('kronhud') || low.includes('simplehud') || low.includes('hud') || low.includes('modmenu')) && !low.endsWith('.disabled');
+        });
+
+        if (hasHudMod) return true;
+
+        sendLogToUI(`[HUD Engine]: Auto-installing In-Game HUD & RSHIFT Menu...`, 'info');
+        const hudProjects = ['kronhud', 'modmenu'];
+        for (const proj of hudProjects) {
+            try {
+                const apiUrl = `https://api.modrinth.com/v2/project/${proj}/version?game_versions=${encodeURIComponent(JSON.stringify([mcVersion]))}&loaders=${encodeURIComponent(JSON.stringify([loader]))}`;
+                const res = await axios.get(apiUrl, { timeout: 8000, headers: { 'User-Agent': 'LONGVEK-Launcher-HUD/2.5' } });
+                if (Array.isArray(res.data) && res.data.length > 0 && res.data[0].files && res.data[0].files.length > 0) {
+                    const file = res.data[0].files.find(f => f.primary) || res.data[0].files[0];
+                    const dest = path.join(instModsDir, file.filename);
+                    if (!fs.existsSync(dest)) {
+                        await downloadFile(file.url, dest, proj);
+                        sendLogToUI(`[HUD Engine]: Installed ${proj} successfully!`, 'success');
+                    }
+                }
+            } catch (err) {
+                console.warn(`[HUD Engine]: Could not fetch ${proj}:`, err.message);
+            }
+        }
+        return true;
+    } catch (e) {
+        console.warn('HUD mod auto-download error:', e.message);
+        return false;
+    }
+}
+
+// =========================================================================
+// SMART CRASH ANALYZER ENGINE
+// =========================================================================
+function analyzeCrashLog(instanceDir, exitCode) {
+    const result = {
+        code: exitCode,
+        summaryEn: 'Unexpected game crash detected.',
+        summaryKh: 'ហ្គេមបានគាំង ឬបិទដោយមិនរំពឹងទុក។',
+        adviceEn: 'Check allocated RAM or mod compatibility in Settings.',
+        adviceKh: 'សូមពិនិត្យមើលទំហំ RAM ឬភាពត្រូវគ្នានៃម៉ូដក្នុងការកំណត់។',
+        details: '',
+        fixType: null,
+        conflictFile: null
+    };
+
+    try {
+        const crashReportsDir = path.join(instanceDir, 'crash-reports');
+        const logsDir = path.join(instanceDir, 'logs');
+        let latestLogText = '';
+
+        if (fs.existsSync(crashReportsDir)) {
+            const reports = fs.readdirSync(crashReportsDir).sort().reverse();
+            if (reports.length > 0) {
+                latestLogText = fs.readFileSync(path.join(crashReportsDir, reports[0]), 'utf8');
+            }
+        }
+
+        if (!latestLogText && fs.existsSync(logsDir)) {
+            const latestLogPath = path.join(logsDir, 'latest.log');
+            if (fs.existsSync(latestLogPath)) {
+                latestLogText = fs.readFileSync(latestLogPath, 'utf8');
+            }
+        }
+
+        result.details = latestLogText.slice(-3000) || `Process exited with code ${exitCode}. No detailed log available.`;
+
+        // Diagnostic 1: Missing Fabric API
+        if (latestLogText.includes('fabric') && (latestLogText.includes('requires fabric') || latestLogText.includes('Missing or unsupported mandatory dependencies:') || latestLogText.includes('fabric-api'))) {
+            result.summaryEn = 'Missing Mandatory Dependency: Fabric API';
+            result.summaryKh = 'ខ្វះបណ្ណាល័យសំខាន់៖ Fabric API';
+            result.adviceEn = 'Many Fabric mods require the Fabric API to run. Click Auto-Fix to install it immediately.';
+            result.adviceKh = 'ម៉ូដ Fabric ភាគច្រើនទាមទារ Fabric API ដើម្បីដំណើរការ។ ចុច Auto-Fix ដើម្បីដំឡើងវាភ្លាមៗ។';
+            result.fixType = 'install_fabric_api';
+            result.fixActionLabelEn = 'Install Fabric API';
+            result.fixActionLabelKh = 'ដំឡើង Fabric API ស្វ័យប្រវត្តិ';
+            return result;
+        }
+
+        // Diagnostic 2: Out of Memory Error
+        if (latestLogText.includes('java.lang.OutOfMemoryError') || latestLogText.includes('Could not reserve enough space') || latestLogText.includes('error: memory')) {
+            result.summaryEn = 'Insufficient RAM Allocated (OutOfMemoryError)';
+            result.summaryKh = 'ខ្វះទំហំ Memory RAM (OutOfMemoryError)';
+            result.adviceEn = 'The game exceeded available memory. Allocate at least 4 GB in Settings.';
+            result.adviceKh = 'ហ្គេមខ្វះខាតទំហំ RAM សម្រាប់ដំណើរការ។ សូមដំឡើង RAM យ៉ាងហោចណាស់ 4 GB ក្នុងការកំណត់។';
+            result.fixType = 'fix_ram_4gb';
+            result.fixActionLabelEn = 'Set Safe 4GB RAM';
+            result.fixActionLabelKh = 'កំណត់ RAM 4GB ស្វ័យប្រវត្តិ';
+            return result;
+        }
+
+        // Diagnostic 3: Mod Conflict (OptiFine + Sodium / Embeddium)
+        if ((latestLogText.includes('optifine') || latestLogText.includes('OptiFine')) && (latestLogText.includes('sodium') || latestLogText.includes('embeddium'))) {
+            result.summaryEn = 'Incompatible Mods Conflict (OptiFine + Sodium)';
+            result.summaryKh = 'ម៉ូដជល់គ្នា (OptiFine ជាមួយ Sodium)';
+            result.adviceEn = 'OptiFine cannot run simultaneously with Sodium or Embeddium shaders engine.';
+            result.adviceKh = 'OptiFine មិនអាចដំណើរការព្រមគ្នាជាមួយម៉ូដបង្កើន FPS Sodium ឬ Embeddium ឡើយ។';
+            result.fixType = 'disable_conflict';
+            result.conflictFile = 'OptiFine';
+            result.fixActionLabelEn = 'Disable Conflicting Mod';
+            result.fixActionLabelKh = 'បិទម៉ូដដែលជល់គ្នា';
+            return result;
+        }
+    } catch (e) {
+        console.warn('Crash log analysis error:', e.message);
+    }
+    return result;
+}
+
+// =========================================================================
+// LOW-END PC TURBO FPS PACK DOWNLOADER
+// =========================================================================
+const LOW_END_FPS_MODS = [
+    { id: 'sodium', fallback: 'embeddium', desc: 'Rendering Engine (2x-3x FPS)' },
+    { id: 'lithium', fallback: null, desc: 'Physics & CPU Optimization' },
+    { id: 'ferrite-core', fallback: null, desc: 'RAM Overhead Reducer (Up to 50%)' },
+    { id: 'immediatelyfast', fallback: null, desc: 'HUD & GUI Rendering Accelerator' },
+    { id: 'entityculling', fallback: null, desc: 'Skip Rendering Hidden Entities' }
+];
+
+async function installLowEndFpsPack(profileId, mcVersion, loader = 'fabric') {
+    const instDir = getInstanceDir(profileId);
+    const modsDir = path.join(instDir, 'mods');
+    if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
+
+    let installedCount = 0;
+    const cleanVer = mcVersion.replace(/^(Fabric|Forge|OptiFine|Release)\s*/i, '').trim();
+    const cleanLoader = (loader || 'fabric').toLowerCase();
+
+    for (const mod of LOW_END_FPS_MODS) {
+        try {
+            let targetModId = mod.id;
+            if (cleanLoader === 'forge' && mod.fallback) targetModId = mod.fallback;
+
+            const apiUrl = `https://api.modrinth.com/v2/project/${targetModId}/version?game_versions=${encodeURIComponent(JSON.stringify([cleanVer]))}&loaders=${encodeURIComponent(JSON.stringify([cleanLoader]))}`;
+            const res = await axios.get(apiUrl, { timeout: 8000, headers: { 'User-Agent': 'LONGVEK-Turbo-Pack/2.5' } });
+
+            if (Array.isArray(res.data) && res.data.length > 0 && res.data[0].files && res.data[0].files.length > 0) {
+                const file = res.data[0].files.find(f => f.primary) || res.data[0].files[0];
+                const dest = path.join(modsDir, file.filename);
+                if (!fs.existsSync(dest)) {
+                    await downloadFile(file.url, dest, targetModId);
+                    installedCount++;
+                }
+            }
+        } catch (err) {
+            console.warn(`[Turbo Pack Error]: Failed downloading ${mod.id}:`, err.message);
+        }
+    }
+    return { success: true, count: installedCount };
+}
+
+// =========================================================================
+// MODPACK IMPORT & SCREENSHOTS GALLERY IPC HANDLERS
+// =========================================================================
+
+// 1. MODPACK DRAG & DROP ACTIVE HANDLER
+ipcMain.handle('import-modpack-file', async (_event, filePath) => {
+    if (!filePath || typeof filePath !== 'string') {
+        return { success: false, error: 'Invalid file path.' };
+    }
+    if (!fs.existsSync(filePath)) {
+        return { success: false, error: 'File does not exist.' };
+    }
+
+    try {
+        const ext = path.extname(filePath).toLowerCase();
+        const baseName = path.basename(filePath, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const profileId = `pack_${baseName}_${Date.now()}`;
+        const targetInstance = getInstanceDir(profileId);
+
+        sendLogToUI(`Extracting modpack: ${path.basename(filePath)}...`, 'info');
+        
+        // សុវត្ថិភាព: Extract zip ទៅកាន់ទីតាំងសុវត្ថិភាព 
+        await extract(filePath, { dir: targetInstance });
+
+        let detectedVersion = '1.20.1';
+        let detectedLoader = 'fabric';
+
+        // Check for Modrinth .mrpack index
+        const modrinthIndex = path.join(targetInstance, 'modrinth.index.json');
+        if (fs.existsSync(modrinthIndex)) {
+            try {
+                const idx = JSON.parse(fs.readFileSync(modrinthIndex, 'utf8'));
+                if (idx.game === 'minecraft') {
+                    detectedVersion = idx.dependencies?.minecraft || detectedVersion;
+                    if (idx.dependencies?.forge) detectedLoader = 'forge';
+                    else if (idx.dependencies?.fabric) detectedLoader = 'fabric';
+                }
+                // Move overrides into root
+                const overridesDir = path.join(targetInstance, 'overrides');
+                if (fs.existsSync(overridesDir)) {
+                    const entries = fs.readdirSync(overridesDir);
+                    for (const entry of entries) {
+                        const src = path.join(overridesDir, entry);
+                        const dst = path.join(targetInstance, entry);
+                        if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true, force: true });
+                        fs.renameSync(src, dst);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        return {
+            success: true,
+            profile: {
+                id: profileId,
+                name: baseName.replace(/_/g, ' '),
+                version: detectedVersion,
+                loader: detectedLoader,
+                icon: 'ph-package'
+            }
+        };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+
+// 2. SCREENSHOTS GALLERY HANDLERS
+ipcMain.handle('get-screenshots', async (_event, profileId) => {
+    try {
+        const instDir = getInstanceDir(profileId);
+        const screenshotsDir = path.join(instDir, 'screenshots');
+        if (!fs.existsSync(screenshotsDir)) return [];
+
+        const files = fs.readdirSync(screenshotsDir);
+        const imageFiles = files.filter(f => /\.(png|jpe?g|webp)$/i.test(f));
+
+        const results = [];
+        for (const file of imageFiles) {
+            const fullPath = path.join(screenshotsDir, file);
+            const stats = fs.statSync(fullPath);
+            results.push({
+                name: file,
+                path: fullPath,
+                time: stats.mtimeMs,
+                size: (stats.size / 1024).toFixed(1) + ' KB',
+                url: `file://${fullPath.replace(/\\/g, '/')}`
+            });
+        }
+        results.sort((a, b) => b.time - a.time);
+        return results;
+    } catch (err) {
+        console.warn('Get screenshots error:', err.message);
+        return [];
+    }
+});
+
+ipcMain.handle('delete-screenshot', async (_event, filePath) => {
+    try {
+        if (!filePath || typeof filePath !== 'string') {
+            return { success: false, error: 'Invalid path' };
+        }
+        // សុវត្ថិភាពខ្ពស់៖ ការពារ Path Traversal ដោយអនុញ្ញាតឱ្យលុបតែហ្វាលណាដែលនៅក្នុង .longvek ប៉ុណ្ណោះ
+        const normalizedPath = path.resolve(filePath);
+        if (!normalizedPath.startsWith(path.resolve(rootPath))) {
+            return { success: false, error: 'Access denied: Path outside safe root.' };
+        }
+
+        if (fs.existsSync(normalizedPath)) {
+            fs.unlinkSync(normalizedPath);
+            return { success: true };
+        }
+        return { success: false, error: 'File not found' };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+
+ipcMain.handle('copy-screenshot-image', async (_event, filePath) => {
+    try {
+        if (!filePath || typeof filePath !== 'string') {
+            return { success: false, error: 'Invalid path' };
+        }
+        // សុវត្ថិភាពខ្ពស់៖ អនុញ្ញាតឱ្យអានតែហ្វាលក្នុង .longvek
+        const normalizedPath = path.resolve(filePath);
+        if (!normalizedPath.startsWith(path.resolve(rootPath))) {
+            return { success: false, error: 'Access denied: Path outside safe root.' };
+        }
+
+        if (fs.existsSync(normalizedPath)) {
+            const img = nativeImage.createFromPath(normalizedPath);
+            clipboard.writeImage(img);
+            return { success: true };
+        }
+        return { success: false, error: 'File not found' };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+
+ipcMain.on('open-external-link', (_event, url) => {
+    if (!url || typeof url !== 'string') return;
+    try {
+        const parsed = new URL(url);
+        // អនុញ្ញាតឱ្យបើកតែ http: និង https: ប៉ុណ្ណោះ ការពារកុំឱ្យបើក file:// ឬ command scripts
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            shell.openExternal(url);
+        } else {
+            console.warn(`[Security Warning]: Blocked unsafe protocol open: ${url}`);
+        }
+    } catch (e) {
+        console.warn(`[Security Warning]: Invalid external URL: ${url}`);
+    }
+});
+
+ipcMain.on('open-screenshot-folder', (_event, profileId) => {
+    const instDir = getInstanceDir(profileId);
+    const screenshotsDir = path.join(instDir, 'screenshots');
+    if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
+    shell.openPath(screenshotsDir);
+});
+
+// =========================================================================
+// DISCORD RPC ENGINE
+// =========================================================================
+const CLIENT_ID = '123456789012345678';
+let rpcStartTime = Date.now();
+let rpcRetryTimer = null;
+
+function initDiscordRPC() {
+    if (!rpcEnabled) return;
+    try {
+        // Lazy loading discord-rpc ដើម្បីកុំឱ្យយឺតពេលបើកកម្មវិធី
+        const DiscordRPC = require('discord-rpc');
+        rpcClient = new DiscordRPC.Client({ transport: 'ipc' });
+        rpcClient.on('ready', () => {
+            console.log('[Discord RPC]: Connected to Discord client');
+            setActivity();
+        });
+        rpcClient.login({ clientId: CLIENT_ID }).catch(() => scheduleDiscordRetry());
+    } catch (e) {
+        scheduleDiscordRetry();
+    }
+}
+
+function scheduleDiscordRetry() {
+    if (!rpcEnabled || rpcRetryTimer) return;
+    rpcRetryTimer = setInterval(() => {
+        if (!rpcClient && rpcEnabled) initDiscordRPC();
+        else if (rpcRetryTimer) { clearInterval(rpcRetryTimer); rpcRetryTimer = null; }
+    }, 15000);
+}
+
+function destroyDiscordRPC() {
+    if (rpcRetryTimer) { clearInterval(rpcRetryTimer); rpcRetryTimer = null; }
+    if (rpcClient) { try { rpcClient.destroy(); } catch (e) {} rpcClient = null; }
+}
+
+function setActivity(details = 'Main Menu', state = 'Ready to Play') {
+    if (!rpcClient || !rpcEnabled) return;
+    try {
+        rpcClient.setActivity({
+            details: details,
+            state: state,
+            largeImageKey: 'logo',
+            largeImageText: 'LONGVEK Launcher',
+            smallImageKey: 'minecraft',
+            smallImageText: 'LONGVEK CLIENT',
+            instance: false,
+            startTimestamp: rpcStartTime
+        }).catch(() => {});
+    } catch (e) {}
+}
+
+function initAutoUpdater() {
+    if (!app.isPackaged) return;
+    try {
+        autoUpdater.autoDownload = false;
+        autoUpdater.on('update-available', (info) => {
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update-available', info);
+        });
+        autoUpdater.on('download-progress', (progress) => {
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update-progress', progress);
+        });
+        autoUpdater.on('update-downloaded', (info) => {
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update-downloaded', info);
+        });
+        autoUpdater.checkForUpdates().catch(err => console.warn('Auto-updater error:', err.message));
+    } catch (e) {}
+}
+
+function createSplashWindow() {
+    if (splashWindow && !splashWindow.isDestroyed()) return;
+
+    splashWindow = new BrowserWindow({
+        width: 480,
+        height: 280,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        resizable: false,
+        center: true,
+        hasShadow: false,
+        backgroundColor: '#00000000',
+        icon: path.join(__dirname, 'LONGVEKLAUNCHER.ico'),
+        webPreferences: { nodeIntegration: false, contextIsolation: true }
+    });
+
+    const splashHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-transparent select-none overflow-hidden flex items-center justify-center h-screen font-sans p-0 m-0">
+      <div class="relative w-[465px] h-[268px] rounded-[24px] border border-cyan-400/40 overflow-hidden bg-slate-950/90 cursor-grab active:cursor-grabbing" style="-webkit-app-region: drag;">
+        <div class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-75" style="background-image: url('https://assets.badlion.net/blog/minecraft-backgrounds/minecraft-mods-back.webp');"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-900/40 to-slate-950/85"></div>
+        <div class="relative z-10 w-full h-full p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/80 border border-white/15 backdrop-blur-md">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span class="text-[10px] tracking-widest font-semibold text-slate-100 uppercase">LongVek Client Engine</span>
+            </div>
+            <div class="px-2.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-400/40 text-[10px] font-mono text-cyan-300 font-bold backdrop-blur-md">v2.5 PRO</div>
+          </div>
+          <div class="flex flex-col items-center justify-center -mt-1">
+            <div class="w-16 h-16 rounded-2xl bg-slate-900/80 border border-cyan-400/50 p-2 flex items-center justify-center backdrop-blur-md">
+              <img src="https://i.postimg.cc/CKpVxR17/longvek-launcher.png" alt="Logo" class="w-full h-full object-contain filter drop-shadow">
+            </div>
+            <h1 class="text-white text-xl font-black tracking-[0.2em] mt-2 flex items-center gap-1.5 drop-shadow-md">
+              LONGVEK <span class="text-cyan-400 font-light text-lg tracking-normal">LAUNCHER</span>
+            </h1>
+            <p class="text-[10px] font-semibold text-slate-200 tracking-widest uppercase mt-0.5 drop-shadow-sm">High Performance • Ultra Turbo FPS</p>
+          </div>
+          <div class="w-full space-y-1.5">
+            <div class="flex justify-between items-center text-[10px] px-0.5 font-semibold">
+              <span class="text-slate-100 flex items-center gap-1.5 drop-shadow-sm">
+                <svg class="w-3 h-3 text-cyan-400 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <span id="splash-status">Checking Java runtime environment...</span>
+              </span>
+              <span id="splash-percent" class="text-cyan-400 font-mono text-[10px] font-bold">12%</span>
+            </div>
+            <div class="relative w-full h-[4px] bg-slate-900/80 rounded-full overflow-hidden border border-white/20">
+              <div id="splash-progress" class="h-full bg-gradient-to-r from-cyan-500 via-sky-400 to-cyan-300 rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_#22d3ee]" style="width: 12%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>
+        const stages = [
+          { percent: 25, text: "Checking Java runtime environment...", delay: 200 },
+          { percent: 50, text: "Scanning Low-End PC Optimization flags...", delay: 800 },
+          { percent: 75, text: "Syncing game profiles & Smart Doctor...", delay: 1400 },
+          { percent: 100, text: "Ready to launch!", delay: 2000 }
+        ];
+        stages.forEach(s => {
+          setTimeout(() => {
+            const st = document.getElementById('splash-status');
+            const sp = document.getElementById('splash-percent');
+            const bar = document.getElementById('splash-progress');
+            if (st) st.textContent = s.text;
+            if (sp) sp.textContent = s.percent + '%';
+            if (bar) bar.style.width = s.percent + '%';
+          }, s.delay);
+        });
+      </script>
+    </body>
+    </html>
+    `;
+    splashWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(splashHtml));
+    setTimeout(() => finishSplashAndOpenMain(), 2400);
+}
+
+function ensureValidUUID(uuid, name = 'Player') {
+    if (!uuid || typeof uuid !== 'string') {
+        const hash = crypto.createHash('md5').update('OfflinePlayer:' + name).digest('hex');
+        return `${hash.slice(0,8)}-${hash.slice(8,12)}-3${hash.slice(13,16)}-${((parseInt(hash.slice(16,18), 16) & 0x3f) | 0x80).toString(16)}${hash.slice(18,20)}-${hash.slice(20,32)}`;
+    }
+    const clean = uuid.replace(/-/g, '').trim();
+    if (clean.length === 32) {
+        return `${clean.slice(0,8)}-${clean.slice(8,12)}-${clean.slice(12,16)}-${clean.slice(16,20)}-${clean.slice(20,32)}`;
+    }
+    const hash = crypto.createHash('md5').update('OfflinePlayer:' + name).digest('hex');
+    return `${hash.slice(0,8)}-${hash.slice(8,12)}-3${hash.slice(13,16)}-${((parseInt(hash.slice(16,18), 16) & 0x3f) | 0x80).toString(16)}${hash.slice(18,20)}-${hash.slice(20,32)}`;
+}
+
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
     app.quit();
@@ -26,283 +921,47 @@ if (!gotTheLock) {
     });
 }
 
-let mainWindow = null;
-let splashWindow = null;
-let isLaunchAborted = false;
-let updateInProgress = false;
-const launcher = new Client();
-
-// កំណត់ទីតាំង Game Directory មូលដ្ឋានក្នុង AppData
-const rootPath = path.join(app.getPath('appData'), '.minecraft');
-const modsDir = path.join(rootPath, 'mods');
-const resourcePacksDir = path.join(rootPath, 'resourcepacks');
-const shaderPacksDir = path.join(rootPath, 'shaderpacks');
-const runtimesDir = path.join(rootPath, 'runtimes');
-
-// បង្កើត Folders ស្វ័យប្រវត្តិប្រសិនបើមិនទាន់មាន
-[rootPath, modsDir, resourcePacksDir, shaderPacksDir, runtimesDir].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-});
-
-const clientId = '1528784445123858523';
-let rpcEnabled = true;
-let rpc = null;
-let currentRpcState = 'In Launcher';
-let currentRpcDetails = 'Preparing to play...';
-const startTimestamp = new Date();
-
-function initDiscordRPC() {
-    if (!rpcEnabled || rpc) return;
-    try {
-        rpc = new DiscordRPC.Client({ transport: 'ipc' });
-        rpc.on('ready', () => {
-            console.log('Discord RPC Connected!');
-            updateRPCActivity();
-        });
-        rpc.login({ clientId }).catch(() => {
-            console.log('Discord RPC Login Failed.');
-        });
-    } catch (err) {
-        console.error('Discord RPC Init Error:', err);
-    }
-}
-
-function destroyDiscordRPC() {
-    if (rpc) {
-        try {
-            rpc.clearActivity();
-            rpc.destroy();
-        } catch (e) {
-            console.error('Error clearing RPC:', e);
-        }
-        rpc = null;
-    }
-}
-
-async function setActivity(state, details) {
-    currentRpcState = state;
-    currentRpcDetails = details;
-    updateRPCActivity();
-}
-
-async function updateRPCActivity() {
-    if (!rpcEnabled || !rpc) return;
-    try {
-        await rpc.setActivity({
-            details: currentRpcDetails,
-            state: currentRpcState,
-            startTimestamp,
-            largeImageKey: 'longveklogo',
-            largeImageText: 'LONGVEKMC LAUNCHER',
-            instance: false
-        });
-    } catch (e) {
-        console.error('Discord RPC Error:', e);
-    }
-}
-
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
-autoUpdater.allowPrerelease = false;
-
-// ភ្ជាប់ Provider ទៅកាន់ GitHub Repository ដោយផ្ទាល់
-autoUpdater.setFeedURL({
-    provider: 'github',
-    owner: 'zarxmcofficial',
-    repo: 'longveklauncher'
-});
-
-function sendSplashStatus(msg, progress = -1, isDone = false) {
-    if (splashWindow && !splashWindow.isDestroyed()) {
-        splashWindow.webContents.send('splash-update-status', { msg, progress, isDone });
-    }
-}
-
-function initAutoUpdater() {
-    autoUpdater.on('checking-for-update', () => {
-        console.log('[AutoUpdater] Checking for updates on GitHub...');
-        sendSplashStatus('Checking for launcher updates...', 20);
-    });
-
-    autoUpdater.on('update-available', (info) => {
-        updateInProgress = true;
-        console.log(`[AutoUpdater] Update found: v${info.version}`);
-        sendSplashStatus(`New version v${info.version} found! Downloading...`, 35);
-    });
-
-    autoUpdater.on('update-not-available', (info) => {
-        console.log('[AutoUpdater] Up to date:', info ? info.version : 'Latest');
-        sendSplashStatus('Launcher is up to date!', 100);
-        setTimeout(() => {
-            finishSplashAndOpenMain();
-        }, 800);
-    });
-
-    autoUpdater.on('download-progress', (progressObj) => {
-        const percent = Math.round(progressObj.percent || 0);
-        console.log(`[AutoUpdater] Downloading: ${percent}%`);
-        sendSplashStatus(`Downloading update: ${percent}%`, percent);
-    });
-
-    autoUpdater.on('update-downloaded', (info) => {
-        console.log(`[AutoUpdater] Update v${info.version} downloaded successfully!`);
-        sendSplashStatus(`Update v${info.version} ready! Restarting...`, 100, true);
-        setTimeout(() => {
-            // បញ្ជាឱ្យបិទកម្មវិធីរួចដំឡើង Setup ថ្មីភ្លាមៗ
-            autoUpdater.quitAndInstall(false, true);
-        }, 1500);
-    });
-
-    autoUpdater.on('error', (err) => {
-        console.error('[AutoUpdater Error]:', err ? err.message : err);
-        sendSplashStatus('Starting launcher...', 100);
-        setTimeout(() => {
-            finishSplashAndOpenMain();
-        }, 1000);
-    });
-}
-
-function createSplashWindow() {
-    splashWindow = new BrowserWindow({
-        width: 480,
-        height: 320,
-        frame: false,
-        transparent: true,
-        resizable: false,
-        center: true,
-        alwaysOnTop: true,
-        backgroundColor: '#00000000',
-        icon: path.join(__dirname, 'LONGVEKLAUNCHER.ico'),
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-        }
-    });
-
-    const splashHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
-        <style>
-            * { font-family: 'Kantumruy Pro', sans-serif; user-select: none; }
-            @keyframes pulseGlow {
-                0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(37, 99, 235, 0.6)); }
-                50% { transform: scale(1.04); filter: drop-shadow(0 0 28px rgba(96, 165, 250, 0.9)); }
-            }
-            .animate-logo { animation: pulseGlow 2.4s ease-in-out infinite; }
-        </style>
-    </head>
-    <body class="bg-transparent flex items-center justify-center h-screen m-0 p-4">
-        <div class="w-full h-full rounded-3xl bg-[#060D1A]/95 border border-blue-500/30 p-6 flex flex-col items-center justify-between shadow-2xl backdrop-blur-xl relative overflow-hidden">
-            <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
-
-            <div class="flex flex-col items-center gap-2 pt-2 z-10">
-                <img src="https://i.postimg.cc/CKpVxR17/longvek-launcher.png" onerror="this.onerror=null; this.src='https://placehold.co/120x120/0B132B/2563EB?text=LMC';" class="w-16 h-16 object-contain animate-logo" />
-                <div class="text-center">
-                    <h1 class="text-xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-blue-200 to-white bg-clip-text text-transparent">LONGVEKMC</h1>
-                    <p class="text-[10px] text-blue-300/80 font-bold uppercase tracking-widest">Next-Gen Minecraft Launcher</p>
-                </div>
-            </div>
-
-            <div class="w-full space-y-2 z-10">
-                <div class="flex justify-between text-xs font-semibold px-1">
-                    <span id="statusTxt" class="text-blue-200 text-[11px] truncate max-w-[300px]">Starting launcher services...</span>
-                    <span id="percentTxt" class="text-blue-400 font-mono text-[11px]">0%</span>
-                </div>
-                <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-blue-900/50">
-                    <div id="bar" class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-300 w-0 shadow-lg shadow-blue-500/50"></div>
-                </div>
-            </div>
-        </div>
-
-        <script>
-            window.addEventListener('DOMContentLoaded', () => {
-                if (window.electronAPI && window.electronAPI.onSplashUpdateStatus) {
-                    window.electronAPI.onSplashUpdateStatus((data) => {
-                        const statusTxt = document.getElementById('statusTxt');
-                        const percentTxt = document.getElementById('percentTxt');
-                        const bar = document.getElementById('bar');
-
-                        if (statusTxt && data.msg) statusTxt.innerText = data.msg;
-                        if (data.progress >= 0) {
-                            if (percentTxt) percentTxt.innerText = data.progress + '%';
-                            if (bar) bar.style.width = data.progress + '%';
-                        }
-                    });
-                }
-            });
-        </script>
-    </body>
-    </html>
-    `;
-
-    splashWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(splashHtml));
-
-    splashWindow.webContents.on('did-finish-load', () => {
-        if (app.isPackaged) {
-            autoUpdater.checkForUpdates().catch((err) => {
-                console.error('[AutoUpdater Check Error]:', err);
-                sendSplashStatus('Starting launcher...', 100);
-                setTimeout(finishSplashAndOpenMain, 1000);
-            });
-        } else {
-            sendSplashStatus('Development Environment Ready', 40);
-            setTimeout(() => sendSplashStatus('Initializing Core Components...', 80), 600);
-            setTimeout(() => {
-                sendSplashStatus('Ready to play!', 100);
-                setTimeout(finishSplashAndOpenMain, 600);
-            }, 1200);
-        }
-    });
-}
-
-function finishSplashAndOpenMain() {
-    if (mainWindow && !mainWindow.isDestroyed()) return;
-    createWindow();
-    if (splashWindow && !splashWindow.isDestroyed()) {
-        splashWindow.close();
-        splashWindow = null;
-    }
-}
-
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 1120,
+        width: 1200,
         height: 720,
-        minWidth: 920,
-        minHeight: 620,
+        minWidth: 980,
+        minHeight: 600,
         frame: false,
-        transparent: true,
-        backgroundColor: '#060D1A',
+        backgroundColor: '#020617',
+        show: false,
         icon: path.join(__dirname, 'LONGVEKLAUNCHER.ico'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            webSecurity: true,
-            devTools: true
+            devTools: !app.isPackaged
         }
     });
 
-    const indexPath = path.join(__dirname, 'index.html');
-    mainWindow.loadFile(indexPath);
+    mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+    // សុវត្ថិភាព: ទប់ស្កាត់រាល់ការ Navigate ទៅកាន់ URL ខាងក្រៅក្នុង Main Window 
+    mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+        const parsedUrl = new URL(navigationUrl);
+        if (parsedUrl.protocol !== 'file:') {
+            event.preventDefault();
+            console.warn(`[Security Warning]: Blocked navigation to ${navigationUrl}`);
+        }
+    });
+
+    // សុវត្ថិភាព: ទប់ស្កាត់រាល់ការបើក window ថ្មីពីក្នុង Renderer
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        console.warn(`[Security Warning]: Blocked window open attempt for ${url}`);
+        return { action: 'deny' };
+    });
 
     mainWindow.on('maximize', () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('window-state', 'maximized');
-        }
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('window-state', 'maximized');
     });
 
     mainWindow.on('unmaximize', () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('window-state', 'unmaximized');
-        }
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('window-state', 'normal');
     });
 
     mainWindow.on('closed', () => {
@@ -310,113 +969,155 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(() => {
-    initDiscordRPC();
-    initAutoUpdater();
-    createSplashWindow();
+function finishSplashAndOpenMain() {
+    if (mainWindow && !mainWindow.isDestroyed()) return;
+    createWindow();
 
-    app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0 && !splashWindow) createWindow();
-    });
-});
-
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
-});
-
-ipcMain.on('minimize-window', () => {
-    if (mainWindow) mainWindow.minimize();
-});
-
-ipcMain.on('maximize-window', () => {
-    if (mainWindow) {
-        if (mainWindow.isMaximized()) mainWindow.unmaximize();
-        else mainWindow.maximize();
-    }
-});
-
-ipcMain.on('close-window', () => {
-    app.quit();
-});
-
-ipcMain.on('open-external-link', (_event, url) => {
-    if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
-        shell.openExternal(url);
-    }
-});
-
-ipcMain.handle('get-system-memory', () => {
-    const totalMemBytes = os.totalmem();
-    const totalMemGb = Math.round(totalMemBytes / (1024 * 1024 * 1024));
-    return {
-        totalGb: totalMemGb,
-        totalMb: Math.floor(totalMemBytes / (1024 * 1024)),
-        freeGb: (os.freemem() / (1024 * 1024 * 1024)).toFixed(1)
-    };
-});
-
-ipcMain.on('request-system-info', (event) => {
-    const totalRamMB = Math.floor(os.totalmem() / (1024 * 1024));
-    event.reply('system-info', { totalRamMB });
-});
-
-ipcMain.on('toggle-discord-rpc', (_event, enable) => {
-    rpcEnabled = enable;
-    if (enable) initDiscordRPC();
-    else destroyDiscordRPC();
-});
-
-ipcMain.on('update-discord-rpc', (_event, data) => {
-    if (data) setActivity(data.state, data.details);
-});
-
-function sendLogToUI(message, type = 'normal') {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('launcher-log', { message, type });
-
-        let status = 'downloading';
-        if (type === 'success' || message.includes('Game successfully launched')) status = 'running';
-        if (type === 'error') status = 'error';
-
-        let percentMatch = message.match(/(\d+(?:\.\d+)?)%/);
-        let progress = percentMatch ? parseFloat(percentMatch[1]) : 50;
-
-        mainWindow.webContents.send('launch-status', { msg: message, status, progress });
-        mainWindow.webContents.send('launcher-status', message);
-    }
-    console.log(`[${type.toUpperCase()}] ${message}`);
-}
-
-async function downloadFile(url, dest, taskName = 'Installer') {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const response = await axios({ url, method: 'GET', responseType: 'stream' });
-            const totalLength = response.headers['content-length'];
-            let downloaded = 0;
-            const writer = fs.createWriteStream(dest);
-
-            response.data.on('data', (chunk) => {
-                downloaded += chunk.length;
-                if (totalLength) {
-                    const percent = ((downloaded / totalLength) * 100).toFixed(1);
-                    sendLogToUI(`Downloading ${taskName}: ${percent}%`, 'download');
-                    if (mainWindow && !mainWindow.isDestroyed()) {
-                        mainWindow.webContents.send('launcher-progress', {
-                            task: downloaded,
-                            total: totalLength,
-                            type: 'download'
-                        });
-                    }
-                }
-            });
-
-            response.data.pipe(writer);
-            writer.on('finish', () => resolve(true));
-            writer.on('error', reject);
-        } catch (err) {
-            reject(err);
+    mainWindow.once('ready-to-show', () => {
+        if (splashWindow && !splashWindow.isDestroyed()) {
+            splashWindow.close();
+            splashWindow = null;
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show();
+            mainWindow.focus();
         }
     });
+}
+
+// Java auto-detect with Java 21 verification
+function getJavaMajorVersion(binPath) {
+    if (!binPath || !fs.existsSync(binPath)) return 0;
+    try {
+        const dir = path.dirname(path.dirname(binPath));
+        const releasePath = path.join(dir, 'release');
+        if (fs.existsSync(releasePath)) {
+            const content = fs.readFileSync(releasePath, 'utf8');
+            const match = content.match(/JAVA_VERSION="?(\d+)/i);
+            if (match) return parseInt(match[1]);
+        }
+    } catch (e) {}
+    return 0;
+}
+
+function findSystemJava(requiredTarget = 'java21') {
+    const isWindows = process.platform === 'win32';
+    const binaryName = isWindows ? 'javaw.exe' : 'java';
+    const fallbackBin = isWindows ? 'java.exe' : 'java';
+
+    // 1. Check local runtimes in .longvek
+    const localDir = path.join(runtimesDir, requiredTarget);
+    const candidates = [
+        path.join(localDir, 'bin', binaryName),
+        path.join(localDir, 'bin', fallbackBin)
+    ];
+
+    if (fs.existsSync(localDir)) {
+        try {
+            const subEntries = fs.readdirSync(localDir);
+            for (const sub of subEntries) {
+                candidates.push(path.join(localDir, sub, 'bin', binaryName));
+                candidates.push(path.join(localDir, sub, 'bin', fallbackBin));
+            }
+        } catch (e) {}
+    }
+
+    // 2. Check official Mojang Launcher runtimes
+    if (isWindows) {
+        const appData = app.getPath('appData');
+        const mojangRuntimes = [
+            path.join(appData, '.minecraft', 'runtime', 'java-runtime-gamma', 'windows-x64', 'java-runtime-gamma', 'bin', binaryName),
+            path.join(appData, '.minecraft', 'runtime', 'java-runtime-delta', 'windows-x64', 'java-runtime-delta', 'bin', binaryName),
+            path.join(appData, '.minecraft', 'runtime', 'java-runtime-beta', 'windows-x64', 'java-runtime-beta', 'bin', binaryName)
+        ];
+        candidates.push(...mojangRuntimes);
+    }
+
+    // 3. Check JAVA_HOME environment
+    if (process.env.JAVA_HOME) {
+        candidates.push(path.join(process.env.JAVA_HOME, 'bin', binaryName));
+        candidates.push(path.join(process.env.JAVA_HOME, 'bin', fallbackBin));
+    }
+
+    // 4. Check common Program Files JDK directories
+    if (isWindows) {
+        const searchBases = [
+            'C:\\Program Files\\Eclipse Adoptium',
+            'C:\\Program Files\\Microsoft',
+            'C:\\Program Files\\Java',
+            'C:\\Program Files\\BellSoft'
+        ];
+        for (const base of searchBases) {
+            if (fs.existsSync(base)) {
+                try {
+                    const subdirs = fs.readdirSync(base);
+                    for (const sub of subdirs) {
+                        candidates.push(path.join(base, sub, 'bin', binaryName));
+                        candidates.push(path.join(base, sub, 'bin', fallbackBin));
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
+    for (const bin of candidates) {
+        if (fs.existsSync(bin)) {
+            const major = getJavaMajorVersion(bin);
+            if (requiredTarget === 'java21' && major >= 21) return bin;
+            if (requiredTarget === 'java17' && major >= 17) return bin;
+            if (requiredTarget === 'java8' && (major === 8 || major === 0)) return bin;
+        }
+    }
+
+    // Fallback search without strict release check
+    for (const bin of candidates) {
+        if (fs.existsSync(bin)) {
+            if (requiredTarget === 'java21' && (bin.includes('21') || bin.includes('gamma'))) return bin;
+            if (requiredTarget === 'java17' && (bin.includes('17') || bin.includes('beta'))) return bin;
+        }
+    }
+
+    return undefined;
+}
+
+async function downloadPortableJava21() {
+    const java21Dir = path.join(runtimesDir, 'java21');
+    if (!fs.existsSync(java21Dir)) fs.mkdirSync(java21Dir, { recursive: true });
+
+    sendLogToUI('Downloading Java 21 OpenJDK Runtime from Adoptium...', 'info');
+    const zipPath = path.join(runtimesDir, 'adoptium-java21.zip');
+    const downloadUrl = 'https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse';
+
+    try {
+        const response = await axios({
+            url: downloadUrl,
+            method: 'GET',
+            responseType: 'stream',
+            timeout: 60000,
+            headers: { 'User-Agent': 'LONGVEK-Launcher/2.5' }
+        });
+
+        const writer = fs.createWriteStream(zipPath);
+        await new Promise((resolve, reject) => {
+            response.data.pipe(writer);
+            writer.on('error', reject);
+            writer.on('close', resolve);
+        });
+
+        sendLogToUI('Extracting Java 21 OpenJDK Runtime...', 'info');
+        await extract(zipPath, { dir: java21Dir });
+        if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+
+        const detected = findSystemJava('java21');
+        if (detected) {
+            sendLogToUI('Java 21 installed successfully!', 'success');
+            return detected;
+        }
+    } catch (err) {
+        sendLogToUI(`Java 21 download failed: ${err.message}`, 'warning');
+        if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+    }
+    return null;
 }
 
 async function ensureJava(gameVersion) {
@@ -429,585 +1130,291 @@ async function ensureJava(gameVersion) {
         else if (minor >= 17) javaTarget = 'java17';
     }
 
-    if (process.platform !== 'win32') return undefined;
+    let detectedJava = findSystemJava(javaTarget);
+    if (detectedJava) return detectedJava;
 
-    const runtimesPath = path.join(runtimesDir, javaTarget);
-    const javaExe = path.join(runtimesPath, 'bin', 'java.exe');
-
-    if (fs.existsSync(javaExe)) return javaExe;
-
-    const urls = {
-        java21: 'https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4%2B7/OpenJDK21U-jre_x64_windows_hotspot_21.0.4_7.zip',
-        java17: 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.12%2B7/OpenJDK17U-jre_x64_windows_hotspot_17.0.12_7.zip',
-        java8: 'https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u422-b05/OpenJDK8U-jre_x64_windows_hotspot_8u422b05.zip'
-    };
-
-    const zipPath = path.join(runtimesDir, `${javaTarget}.zip`);
-    const tempDir = path.join(runtimesDir, `${javaTarget}_temp`);
-
-    sendLogToUI(`Java ${javaTarget.replace('java', '')} is missing! Downloading automatically...`, 'info');
-    await downloadFile(urls[javaTarget], zipPath, `Java ${javaTarget.replace('java', '')}`);
-
-    sendLogToUI(`Extracting Java runtime... Please wait.`, 'info');
-    try {
-        await extract(zipPath, { dir: tempDir });
-        const extractedFolders = fs.readdirSync(tempDir);
-        fs.renameSync(path.join(tempDir, extractedFolders[0]), runtimesPath);
-        fs.rmSync(tempDir, { recursive: true, force: true });
-        fs.unlinkSync(zipPath);
-
-        sendLogToUI(`Java installed successfully!`, 'success');
-        return javaExe;
-    } catch (err) {
-        sendLogToUI(`Failed to install Java: ${err.message}`, 'error');
-        return undefined;
+    // ប្រសិនបើជា Minecraft 1.20.5+ / 1.21+ ហើយខ្វះ Java 21 ទាញយក Portable Java 21 ដោយស្វ័យប្រវត្តិ
+    if (javaTarget === 'java21') {
+        sendLogToUI('Java 21 required for Minecraft 1.21+. Auto-installing...', 'info');
+        const autoInstalledJava = await downloadPortableJava21();
+        if (autoInstalledJava) return autoInstalledJava;
     }
+
+    return process.platform === 'win32' ? 'javaw' : 'java';
 }
 
-ipcMain.handle('get-local-versions', async () => {
-    const versionsPath = path.join(rootPath, 'versions');
+// =========================================================================
+// IPC HANDLERS FOR LOW-END BOOST PACK, RAM CLEANUP & SMART DOCTOR
+// =========================================================================
+
+ipcMain.handle('clean-memory', async () => {
+    performRamCleanup();
+    return { success: true };
+});
+
+ipcMain.handle('install-fps-pack', async (_event, { profileId, version, loader }) => {
     try {
-        if (fs.existsSync(versionsPath)) {
-            const files = fs.readdirSync(versionsPath, { withFileTypes: true });
-            return files.filter(dirent => dirent.isDirectory()).map(dirent => dirent.name);
-        }
-        return [];
+        const res = await installLowEndFpsPack(profileId, version, loader);
+        return res;
     } catch (err) {
-        console.error('Failed to read versions:', err);
-        return [];
+        return { success: false, error: err.message };
     }
 });
 
-ipcMain.on('ms-login', async (event, lang = 'en') => {
-    const isKm = lang === 'km';
+ipcMain.handle('auto-fix-crash', async (_event, { profileId, fixType, conflictFile, mcVersion }) => {
     try {
-        event.reply('ms-login-status', { 
-            status: 'loading', 
-            msg: isKm ? 'កំពុងបើកផ្ទាំងចូលគណនី Microsoft...' : 'Opening Microsoft Login...' 
-        });
+        const instanceDir = getInstanceDir(profileId);
+        const modsDir = path.join(instanceDir, 'mods');
 
-        const AuthClass = msmc.Auth || (msmc.default && msmc.default.Auth) || (typeof msmc === 'function' ? msmc : null);
-        let mclcAuthResult = null;
-        let playerName = 'Microsoft Player';
-        let playerId = Date.now().toString();
-
-        if (AuthClass && typeof AuthClass === 'function') {
-            const authManager = new AuthClass('select_account');
-            const xboxManager = await authManager.launch('electron');
-            event.reply('ms-login-status', { 
-                status: 'loading', 
-                msg: isKm ? 'កំពុងទាញយក Minecraft Token...' : 'Getting Minecraft Token...' 
-            });
-            const token = await xboxManager.getMinecraft();
-            
-            mclcAuthResult = typeof token.mclc === 'function' ? token.mclc() : (token.mclc || token);
-            playerName = mclcAuthResult.name || (token.profile && token.profile.name) || playerName;
-            playerId = mclcAuthResult.uuid || mclcAuthResult.id || playerId;
-        } else if (typeof msmc.fastLaunch === 'function') {
-            const result = await msmc.fastLaunch('electron', (update) => {
-                event.reply('ms-login-status', { 
-                    status: 'loading', 
-                    msg: update.message || (isKm ? 'កំពុងផ្ទៀងផ្ទាត់...' : 'Authenticating...') 
-                });
-            });
-            if (msmc.errorCheck && msmc.errorCheck(result)) {
-                throw new Error(result.reason || (isKm ? 'ការផ្ទៀងផ្ទាត់មិនជោគជ័យ' : 'Authentication failed'));
-            }
-            mclcAuthResult = typeof result.mclc === 'function' ? result.mclc() : (result.mclc || result);
-            playerName = mclcAuthResult.name || (result.profile && result.profile.name) || playerName;
-            playerId = mclcAuthResult.uuid || mclcAuthResult.id || playerId;
-        } else {
-            throw new Error(isKm ? 'MSMC library ដំណើរការមិនបានសម្រេច។' : 'MSMC library initialization failed.');
-        }
-
-        if (mclcAuthResult) {
-            // សម្អាតទិន្នន័យ Token ឱ្យនៅតែ String សុទ្ធ ដើម្បីការពារបញ្ហា IPC serialization failure
-            const cleanMclcAuth = {
-                access_token: String(mclcAuthResult.access_token || mclcAuthResult.mcToken || ''),
-                client_token: String(mclcAuthResult.client_token || 'longvek-launcher'),
-                uuid: String(mclcAuthResult.uuid || playerId),
-                name: String(playerName),
-                user_properties: "{}"
-            };
-
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                if (mainWindow.isMinimized()) mainWindow.restore();
-                mainWindow.show();
-                mainWindow.focus();
-            }
-
-            event.reply('ms-login-status', {
-                status: 'success',
-                account: {
-                    id: 'ms_' + playerId,
-                    name: playerName,
-                    type: 'microsoft',
-                    role: 'Premium Account',
-                    accountCategory: 'premium',
-                    mclcAuth: cleanMclcAuth,
-                    skinName: playerName,
-                    playtimeMins: 0
+        if (fixType === 'install_fabric_api') {
+            const ver = mcVersion || '1.20.1';
+            const ok = await ensureFabricAPI(instanceDir, ver);
+            return { success: ok, message: ok ? 'Fabric API successfully installed!' : 'Failed to install Fabric API.' };
+        } else if (fixType === 'disable_conflict') {
+            if (conflictFile && fs.existsSync(modsDir)) {
+                const targetMod = path.join(modsDir, conflictFile);
+                if (fs.existsSync(targetMod)) {
+                    fs.renameSync(targetMod, targetMod + '.disabled');
+                    return { success: true, message: `Disabled conflicting mod: ${conflictFile}` };
                 }
-            });
-        } else {
-            throw new Error(isKm ? 'មិនអាចទាញយក Minecraft Token បានទេ។' : 'Failed to get Minecraft token.');
+            }
+            return { success: false, message: 'Conflicting file not found on disk.' };
+        } else if (fixType === 'fix_ram_4gb') {
+            return { success: true, message: 'RAM configured to 4GB safe memory.', newRam: 4 };
         }
-    } catch (error) {
-        console.error('MS Login Error:', error);
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            if (mainWindow.isMinimized()) mainWindow.restore();
-            mainWindow.show();
-            mainWindow.focus();
-        }
-        event.reply('ms-login-status', { 
-            status: 'error', 
-            msg: error.message || (isKm ? 'ការចូលគណនីបានបរាជ័យ ឬត្រូវបានបោះបង់' : 'Login failed or was cancelled') 
-        });
+        return { success: false, message: 'Unknown fix type.' };
+    } catch (err) {
+        return { success: false, error: err.message };
     }
 });
 
-ipcMain.handle('login-microsoft', async () => {
+ipcMain.handle('get-available-versions', async (_event, releaseOnly = true) => {
+    return await mcEngine.fetchVanillaVersions(releaseOnly);
+});
+
+ipcMain.handle('get-fabric-loaders', async (_event, gameVersion) => {
+    return await mcEngine.fetchFabricLoaders(gameVersion);
+});
+
+ipcMain.handle('install-version-engine', async (_event, { version, loader }) => {
     try {
-        const AuthClass = msmc.Auth || (msmc.default && msmc.default.Auth) || (typeof msmc === 'function' ? msmc : null);
-        if (AuthClass && typeof AuthClass === 'function') {
-            const authManager = new AuthClass('select_account');
-            const xboxManager = await authManager.launch('electron');
-            const token = await xboxManager.getMinecraft();
-            return {
-                success: true,
-                profile: typeof token.mclc === 'function' ? token.mclc() : (token.mclc || token)
-            };
-        } else if (typeof msmc.fastLaunch === 'function') {
-            const result = await msmc.fastLaunch('electron');
-            return {
-                success: true,
-                profile: typeof result.mclc === 'function' ? result.mclc() : (result.mclc || result)
-            };
+        if ((loader || 'vanilla').toLowerCase() === 'fabric') {
+            const fabricId = await mcEngine.setupFabricProfile(version);
+            return { success: !!fabricId, versionId: fabricId || version };
         }
-        return { success: false, error: 'MSMC not initialized' };
-    } catch (error) {
-        return { success: false, error: error.message };
+        return { success: true, versionId: version };
+    } catch (err) {
+        return { success: false, error: err.message };
     }
 });
 
 ipcMain.on('cancel-launch', () => {
     isLaunchAborted = true;
     sendLogToUI('Launch sequence cancelled by user.', 'warning');
-    setActivity('In Launcher', 'Ready to play');
+    setActivity('Main Menu', 'Ready to Play');
 });
 
+// Test HUD Overlay simulation event
+ipcMain.on('test-overlay', (_event, data) => {
+    console.log('[HUD Overlay Test]: Triggered preview for', data);
+    sendLogToUI(`[HUD Engine]: LONGVEK In-Game HUD activated for ${data.username || 'Player'}! Press RSHIFT to toggle menu.`, 'success');
+});
+
+// =========================================================================
+// GAME LAUNCH DISPATCHER WITH AUTO RAM CLEANUP
+// =========================================================================
 ipcMain.on('launch-game', async (event, data) => {
     isLaunchAborted = false;
     const username = data.username || 'Player';
-    const version = data.version || '1.20.4';
+    const version = data.version || '1.20.1';
     const authData = data.mclcAuth || data.msAuthObj;
     const isOffline = data.accountType !== 'microsoft' && !data.isMicrosoft;
     const profileId = data.profileId || 'default';
 
-    // --- SMART SAFE-RAM & ANTI-CRASH SYSTEM FOR LOW-END PCs ---
+    performRamCleanup();
+
+    launcher.removeAllListeners('debug');
+    launcher.removeAllListeners('data');
+    launcher.removeAllListeners('progress');
+    launcher.removeAllListeners('close');
+
     const sysTotalMemMB = Math.floor(os.totalmem() / (1024 * 1024));
     const sysTotalMemGB = Math.round(sysTotalMemMB / 1024);
-    let requestedRamGB = parseInt(data.ram || (data.maxRam ? data.maxRam.replace('G', '') : '4')) || 4;
+    let requestedRamGB = parseInt(data.ram || (data.maxRam ? String(data.maxRam).replace(/[^0-9]/g, '') : '4')) || 4;
 
-    // ប្រសិនបើ PC ខ្សោយ (RAM 4GB ឬតិចជាង) ឬអ្នកប្រើកំណត់ RAM លើស 75% នៃ RAM ម៉ាស៊ីន
-    // យើងនឹងតម្រង់ RAM ឱ្យនៅកម្រិតសុវត្ថិភាពបំផុតដើម្បីការពារកុំឱ្យ Windows ខ្វះ RAM រួច crash បិទហ្គេម
-    let safeMaxRamGB = requestedRamGB;
+    let safeMaxRamMB = requestedRamGB * 1024;
     if (sysTotalMemGB <= 4) {
-        safeMaxRamGB = Math.min(requestedRamGB, 2.5); // ទុក RAM យ៉ាងហោច 1.5GB ឱ្យ Windows & GPU
-        sendLogToUI(`[Smart Safe-RAM]: Low-end PC detected (${sysTotalMemGB}GB). Auto-optimizing RAM to ${safeMaxRamGB}GB to prevent crashes!`, 'system');
+        safeMaxRamMB = Math.min(safeMaxRamMB, 2560);
     } else if (requestedRamGB >= sysTotalMemGB) {
-        safeMaxRamGB = Math.max(2, sysTotalMemGB - 2);
-        sendLogToUI(`[Smart Safe-RAM]: RAM clamped to safe limit (${safeMaxRamGB}GB) to prevent game termination.`, 'system');
+        safeMaxRamMB = Math.max(2048, (sysTotalMemGB - 2) * 1024);
     }
 
-    const maxMem = `${safeMaxRamGB}G`;
-    const minMem = `${Math.max(1, Math.min(2, Math.floor(safeMaxRamGB / 2)))}G`;
+    const safeMinRamMB = Math.max(1024, Math.floor(safeMaxRamMB / 2));
+    const maxMem = `${safeMaxRamMB}M`;
+    const minMem = `${safeMinRamMB}M`;
 
-    // --- PRO-G1GC & ANTI-STUTTER FPS ENGINE FLAGS ---
-    // កូដ Java JVM ពិសេសសម្រាប់លុបបំបាត់ការកន្ត្រាក់ FPS (GC Stutters) និងជួយសន្សំសំចៃ RAM
     const defaultUltraFpsFlags = [
         "-XX:+UseG1GC",
         "-XX:+ParallelRefProcEnabled",
-        "-XX:MaxGCPauseMillis=50", // បន្ថយ Pause Time ឱ្យខ្លីបំផុតដើម្បីកុំឱ្យធ្លាក់ FPS
+        "-XX:MaxGCPauseMillis=50",
         "-XX:+UnlockExperimentalVMOptions",
         "-XX:+DisableExplicitGC",
-        "-XX:+AlwaysPreTouch",
-        "-XX:G1NewSizePercent=25",
-        "-XX:G1MaxNewSizePercent=35",
-        "-XX:G1HeapRegionSize=8M",
+        "-XX:G1NewSizePercent=20",
+        "-XX:G1MaxNewSizePercent=30",
         "-XX:G1ReservePercent=15",
-        "-XX:G1HeapWastePercent=5",
-        "-XX:G1MixedGCCountTarget=4",
-        "-XX:InitiatingHeapOccupancyPercent=15",
-        "-XX:G1MixedGCLiveThresholdPercent=90",
-        "-XX:G1RSetUpdatingPauseTimePercent=5",
         "-XX:SurvivorRatio=32",
         "-XX:+PerfDisableSharedMem",
-        "-XX:MaxTenuringThreshold=1",
-        "-XX:+UseStringDeduplication", // ជួយកាត់បន្ថយការស៊ី RAM បាន 20% - 30% លើ PC ខ្សោយ
-        "-Dfml.ignoreInvalidMinecraftCertificates=true",
-        "-Dfml.ignorePatchDiscrepancies=true"
+        "-XX:+UseStringDeduplication",
+        "-Dminecraft.launcher.brand=LONGVEK-Launcher",
+        "-Dminecraft.launcher.version=2.5"
     ];
 
-    // បញ្ចូល custom args របស់អ្នកប្រើប្រាស់ដោយមិនឱ្យជាន់គ្នា
     const userArgs = Array.isArray(data.customArgs) ? data.customArgs : [];
     const mergedArgs = [...defaultUltraFpsFlags];
     userArgs.forEach(arg => {
-        if (!mergedArgs.includes(arg)) mergedArgs.push(arg);
+        if (arg && !mergedArgs.includes(arg)) mergedArgs.push(arg);
     });
 
-    const instanceDir = path.join(rootPath, 'instances', profileId.replace(/[^a-zA-Z0-9]/g, '_'));
-    if (!fs.existsSync(instanceDir)) fs.mkdirSync(instanceDir, { recursive: true });
+    const instanceDir = getInstanceDir(profileId);
+    let cleanVersion = version.replace(/^(Fabric|Forge|OptiFine|Release)\s*/i, '').trim();
 
-    let folderVersion = version;
-    if (version.startsWith('Release ')) folderVersion = version.replace('Release ', '');
-    const cleanVersion = folderVersion.replace(/^(Fabric|Forge|OptiFine)\s*/i, '').trim();
-    const lowerVersion = folderVersion.toLowerCase();
+    // ជួសជុល Version ក្លែងក្លាយ 1.21.11 ទៅជា 1.21.1 ដោយស្វ័យប្រវត្តិ
+    if (cleanVersion === '1.21.11') {
+        cleanVersion = '1.21.1';
+    }
 
-    sendLogToUI(`Initializing LONGVEK Ultra FPS Engine...`, 'system');
-    sendLogToUI(`System RAM: ${sysTotalMemGB}GB | Allocated RAM: ${maxMem} (Min: ${minMem})`, 'system');
-    sendLogToUI(`Player: ${username} | Version: ${folderVersion}`, 'system');
-    setActivity(`In Game: ${folderVersion}`, `Playing as ${username}`);
+    sanitizeInstanceMods(instanceDir, cleanVersion);
+    ensureLongvekInGameConfig(instanceDir, username);
+
+    let activeLoader = (data.loader || 'vanilla').toLowerCase();
+
+    sendLogToUI(`Cleaning RAM & Preparing Game Engine...`, 'system');
+    sendLogToUI(`Allocated RAM: ${maxMem} (System: ${sysTotalMemGB}GB)`, 'system');
+    sendLogToUI(`Player: ${username} | Version: ${cleanVersion} | Loader: ${activeLoader.toUpperCase()}`, 'system');
+    setActivity(`Playing Minecraft ${cleanVersion}`, `Player: ${username} • LONGVEK CLIENT`);
 
     try {
         let authObj;
         if (isOffline) {
-            authObj = Authenticator.getAuth(username);
+            authObj = Authenticator.getAuth(username.replace(/\s+/g, '_'));
         } else {
-            if (!authData) throw new Error('Session expired! Please re-login.');
-            authObj = authData;
+            authObj = {
+                access_token: authData.access_token,
+                client_token: authData.client_token || 'longvek-launcher',
+                uuid: ensureValidUUID(authData.uuid, username),
+                name: authData.name || username,
+                user_properties: "{}",
+                meta: { type: 'msa', demo: false }
+            };
         }
 
         let opts = {
             authorization: authObj,
             root: rootPath,
-            overrides: {
-                gameDirectory: instanceDir
-            },
-            version: { number: cleanVersion, type: 'release' },
+            overrides: { gameDirectory: instanceDir },
+            version: { number: cleanVersion, type: 'LONGVEK Client' },
             memory: { max: maxMem, min: minMem },
             customArgs: mergedArgs
         };
 
-        let useJavaPath = await ensureJava(cleanVersion);
-        if (useJavaPath) {
-            opts.javaPath = useJavaPath;
-            sendLogToUI(`Using optimized Java Runtime: ${useJavaPath}`, 'system');
-        }
+        const useJavaPath = await ensureJava(cleanVersion);
+        if (useJavaPath) opts.javaPath = useJavaPath;
 
-        if (lowerVersion.includes('fabric')) {
-            sendLogToUI(`Fabric detected! Preparing Fabric Auto-Loader...`, 'system');
-            opts.fabric = { build: 'latest' };
-        } else if (lowerVersion.includes('forge')) {
-            sendLogToUI(`Forge detected! Initializing Forge files...`, 'system');
-            opts.version.custom = folderVersion;
-        } else {
-            opts.version.custom = folderVersion;
+        if (activeLoader === 'fabric') {
+            const customFabricId = await ensureFabricProfile(cleanVersion);
+            if (customFabricId) opts.version.custom = customFabricId;
+            await ensureFabricAPI(instanceDir, cleanVersion);
+            await ensureInGameHudMod(instanceDir, cleanVersion, activeLoader);
         }
 
         let hasGameStarted = false;
 
         launcher.on('debug', (e) => console.log(`[MCLC]: ${e}`));
-
-        launcher.on('data', () => {
+        launcher.on('data', (d) => {
+            const logLine = String(d || '');
             if (!hasGameStarted) {
                 hasGameStarted = true;
-                sendLogToUI('Game successfully launched! Ultra FPS Engine Active.', 'success');
+                sendLogToUI('Game process initialized. Loading Minecraft...', 'info');
+                if (data.launcherAction === 'hide' && mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.hide();
+                } else if (data.launcherAction === 'close') {
+                    app.quit();
+                }
+            }
+            if (logLine.includes('OpenAL initialized') || logLine.includes('Setting user:')) {
+                sendLogToUI('Minecraft loaded successfully! Low-End Optimization Active.', 'success');
             }
         });
 
         launcher.on('progress', (e) => {
-            let percent = 0;
-            if (e.total && e.total > 0) {
-                percent = ((e.task / e.total) * 100).toFixed(1);
-            }
-            if (['download', 'assets', 'natives', 'classes'].includes(e.type)) {
-                sendLogToUI(`Downloading ${e.type.toUpperCase()} (${percent}%)...`, 'download');
-            } else if (e.task % 50 === 0 || e.task === e.total) {
-                sendLogToUI(`Processing Game Files: ${percent}%`, 'info');
-            }
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('launcher-progress', e);
-            }
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('launcher-progress', e);
         });
 
         launcher.on('close', (code) => {
-            if (code === 0) {
-                sendLogToUI(`Game closed normally.`, 'info');
-            } else {
-                sendLogToUI(`Game closed with code: ${code}. Anti-Crash system saved log.`, 'warning');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.show();
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                mainWindow.focus();
             }
-            setActivity('In Launcher', 'Ready to play...');
+
+            if (code !== 0) {
+                console.warn(`[Minecraft Crash]: Game exited with code ${code}`);
+                const analysis = analyzeCrashLog(instanceDir, code);
+                analysis.mcVersion = cleanVersion;
+                analysis.profileId = profileId;
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('game-crashed', analysis);
+                }
+            }
+            setActivity('Main Menu', 'Ready to Play');
             event.reply('launch-status', { msg: 'Game Closed', progress: 0, status: 'stopped' });
             event.reply('game-closed', code);
         });
 
-        if (isLaunchAborted) {
-            sendLogToUI('Launch aborted before start.', 'warning');
-            return;
-        }
-
-        sendLogToUI(`Starting Minecraft smoothly on [${instanceDir}]...`, 'info');
+        if (isLaunchAborted) return;
         await launcher.launch(opts);
     } catch (error) {
         sendLogToUI(`Launch Error: ${error.message}`, 'error');
-        console.error('CRITICAL LAUNCH ERROR:', error);
-        setActivity('In Launcher', 'Error launching game.');
-    }
-});
-
-ipcMain.handle('get-installed-content', async () => {
-    const readDirSafe = (dirPath) => {
-        try {
-            if (!fs.existsSync(dirPath)) return [];
-            return fs.readdirSync(dirPath).map(file => {
-                const fullPath = path.join(dirPath, file);
-                const stats = fs.statSync(fullPath);
-                return {
-                    name: file,
-                    sizeMb: (stats.size / (1024 * 1024)).toFixed(1),
-                    isEnabled: !file.endsWith('.disabled')
-                };
-            });
-        } catch {
-            return [];
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('launcher-log', { message: error.message, type: 'error' });
         }
-    };
-
-    return {
-        mods: readDirSafe(modsDir),
-        resourcePacks: readDirSafe(resourcePacksDir),
-        shaderPacks: readDirSafe(shaderPacksDir)
-    };
-});
-
-ipcMain.on('install-mod', async (event, data) => {
-    try {
-        let subFolder = 'mods';
-        if (data.type === 'resourcepack' || data.type === 'resource') subFolder = 'resourcepacks';
-        if (data.type === 'shader' || data.type === 'shaderpack') subFolder = 'shaderpacks';
-
-        const targetDir = path.join(rootPath, subFolder);
-        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
-
-        const destPath = path.join(targetDir, data.fileName);
-        await downloadFile(data.downloadUrl, destPath, `Addon: ${data.fileName}`);
-        event.reply('mod-installed', data.modName || data.fileName);
-    } catch (error) {
-        console.error(`Failed to install addon:`, error);
     }
 });
 
-ipcMain.handle('delete-content-file', async (_event, { category, fileName }) => {
-    try {
-        let targetDir = modsDir;
-        if (category === 'resource' || category === 'resourcepack') targetDir = resourcePacksDir;
-        if (category === 'shader' || category === 'shaderpack') targetDir = shaderPacksDir;
-
-        const filePath = path.join(targetDir, fileName);
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            return { success: true };
-        }
-        return { success: false, error: 'File not found' };
-    } catch (err) {
-        return { success: false, error: err.message };
+// App Window Management & Standard IPCs
+ipcMain.on('minimize-window', () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize(); });
+ipcMain.on('maximize-window', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMaximized()) mainWindow.unmaximize();
+        else mainWindow.maximize();
     }
 });
-
-ipcMain.on('delete-mod', (event, data) => {
-    try {
-        let subFolder = data.type === 'resourcepack' ? 'resourcepacks' : (data.type === 'shader' ? 'shaderpacks' : 'mods');
-        const targetPath = path.join(rootPath, subFolder, data.filename || data.fileName);
-        if (fs.existsSync(targetPath)) {
-            fs.unlinkSync(targetPath);
-            console.log(`Deleted file: ${targetPath}`);
-        }
-    } catch (error) {
-        console.error(`Failed to delete mod:`, error);
-    }
-});
-
-ipcMain.handle('toggle-content-file', async (_event, { category, fileName, enable }) => {
-    try {
-        let targetDir = modsDir;
-        if (category === 'resource' || category === 'resourcepack') targetDir = resourcePacksDir;
-        if (category === 'shader' || category === 'shaderpack') targetDir = shaderPacksDir;
-
-        const oldPath = path.join(targetDir, fileName);
-        let newName = enable ? fileName.replace('.disabled', '') : (fileName.endsWith('.disabled') ? fileName : `${fileName}.disabled`);
-        const newPath = path.join(targetDir, newName);
-
-        if (fs.existsSync(oldPath)) {
-            fs.renameSync(oldPath, newPath);
-            return { success: true, newFileName: newName };
-        }
-        return { success: false, error: 'File not found' };
-    } catch (err) {
-        return { success: false, error: err.message };
-    }
-});
-
-ipcMain.on('toggle-mod', (_event, data) => {
-    try {
-        let subFolder = data.type === 'resourcepack' ? 'resourcepacks' : (data.type === 'shader' ? 'shaderpacks' : 'mods');
-        const basePath = path.join(rootPath, subFolder, data.filename);
-        if (data.enable && fs.existsSync(basePath + '.disabled')) {
-            fs.renameSync(basePath + '.disabled', basePath);
-        } else if (!data.enable && fs.existsSync(basePath)) {
-            fs.renameSync(basePath, basePath + '.disabled');
-        }
-    } catch (err) {
-        console.error('Failed to toggle mod:', err);
-    }
-});
-
-ipcMain.handle('add-custom-content-files', async (_event, category) => {
-    let targetDir = modsDir;
-    let fileFilters = [{ name: 'Mods (.jar)', extensions: ['jar'] }];
-
-    if (category === 'resource' || category === 'resourcepack') {
-        targetDir = resourcePacksDir;
-        fileFilters = [{ name: 'Resource Packs (.zip)', extensions: ['zip'] }];
-    } else if (category === 'shader' || category === 'shaderpack') {
-        targetDir = shaderPacksDir;
-        fileFilters = [{ name: 'Shaders (.zip)', extensions: ['zip'] }];
-    }
-
-    const result = await dialog.showOpenDialog(mainWindow, {
-        title: 'Select Custom Files to Install',
-        properties: ['openFile', 'multiSelections'],
-        filters: fileFilters
-    });
-
-    if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
-    }
-
-    try {
-        result.filePaths.forEach(sourcePath => {
-            const destPath = path.join(targetDir, path.basename(sourcePath));
-            fs.copyFileSync(sourcePath, destPath);
-        });
-        return { success: true, count: result.filePaths.length };
-    } catch (err) {
-        return { success: false, error: err.message };
-    }
-});
-
-ipcMain.on('open-game-folder', (_event, subFolder) => {
-    let targetPath = rootPath;
-    if (subFolder === 'mods') targetPath = modsDir;
-    else if (subFolder === 'resourcepacks') targetPath = resourcePacksDir;
-    else if (subFolder === 'shaderpacks') targetPath = shaderPacksDir;
-    shell.openPath(targetPath);
-});
-
+ipcMain.on('close-window', () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close(); });
 ipcMain.on('open-profile-folder', (_event, profileId) => {
-    const instanceDir = path.join(rootPath, 'instances', (profileId || 'default').replace(/[^a-zA-Z0-9]/g, '_'));
-    if (!fs.existsSync(instanceDir)) fs.mkdirSync(instanceDir, { recursive: true });
-    shell.openPath(instanceDir);
+    shell.openPath(getInstanceDir(profileId));
 });
 
-ipcMain.on('apply-fps-boost', (_event, profileId) => {
-    try {
-        const instanceDir = path.join(rootPath, 'instances', (profileId || 'default').replace(/[^a-zA-Z0-9]/g, '_'));
-        const profileModsDir = path.join(instanceDir, 'mods');
-        if (!fs.existsSync(profileModsDir)) fs.mkdirSync(profileModsDir, { recursive: true });
-        console.log(`[FPS Boost] Prepared instance folder for boost: ${instanceDir}`);
-    } catch (err) {
-        console.error('FPS Boost failed:', err);
-    }
+ipcMain.handle('get-system-memory', () => {
+    const totalMemMB = Math.floor(os.totalmem() / (1024 * 1024));
+    return {
+        totalGB: Math.round(totalMemMB / 1024),
+        totalMB: totalMemMB,
+        freeMB: Math.floor(os.freemem() / (1024 * 1024))
+    };
 });
 
-// --- P2P Friend Worlds (e4mc & LAN Bridge Handlers) ---
-ipcMain.on('copy-to-clipboard', (_event, text) => {
-    if (typeof text === 'string') {
-        clipboard.writeText(text);
-    }
-});
+app.whenReady().then(() => {
+    app.setName('LONGVEK Launcher');
+    initDiscordRPC();
+    initAutoUpdater();
+    createSplashWindow();
 
-ipcMain.handle('check-p2p-domain', async (_event, targetAddress) => {
-    if (!targetAddress || typeof targetAddress !== 'string') {
-        return { online: false, error: 'Invalid address' };
-    }
-
-    let host = targetAddress.trim().replace(/^https?:\/\//i, '');
-    let port = 25565;
-
-    if (host.includes(':')) {
-        const parts = host.split(':');
-        host = parts[0];
-        port = parseInt(parts[1]) || 25565;
-    }
-
-    const startTime = Date.now();
-    return new Promise((resolve) => {
-        const socket = new net.Socket();
-        socket.setTimeout(4500);
-
-        socket.on('connect', () => {
-            const latency = Date.now() - startTime;
-            socket.destroy();
-            resolve({ online: true, latency, host, port });
-        });
-
-        socket.on('timeout', () => {
-            socket.destroy();
-            resolve({ online: false, error: 'Connection timed out' });
-        });
-
-        socket.on('error', (err) => {
-            socket.destroy();
-            resolve({ online: false, error: err.message });
-        });
-
-        socket.connect(port, host);
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
 });
 
-ipcMain.handle('install-e4mc-mod', async (_event, { profileId, version, loader }) => {
-    try {
-        const targetLoader = (loader || 'fabric').toLowerCase();
-        let cleanVer = (version || '1.20.1').replace(/^(Fabric|Forge|OptiFine)\s*/i, '').trim();
-
-        // កំណត់ instance mods directory
-        const instanceDir = path.join(rootPath, 'instances', (profileId || 'default').replace(/[^a-zA-Z0-9]/g, '_'));
-        const targetModsDir = path.join(instanceDir, 'mods');
-        if (!fs.existsSync(targetModsDir)) fs.mkdirSync(targetModsDir, { recursive: true });
-
-        // ស្វែងរក mod e4mc ពី Modrinth API ដោយស្វ័យប្រវត្តិ
-        const apiUrl = `https://api.modrinth.com/v2/project/e4mc/version?loaders=["${targetLoader === 'forge' ? 'forge' : 'fabric'}"]&game_versions=["${cleanVer}"]`;
-        const res = await axios.get(apiUrl, { timeout: 8000 });
-
-        if (!Array.isArray(res.data) || res.data.length === 0 || !res.data[0].files || res.data[0].files.length === 0) {
-            // បើមិនឃើញ version ជាក់លាក់ ទាញយក generic version ចុងក្រោយ
-            const fallbackRes = await axios.get('https://api.modrinth.com/v2/project/e4mc/version', { timeout: 8000 });
-            if (!Array.isArray(fallbackRes.data) || fallbackRes.data.length === 0) {
-                return { success: false, error: 'No compatible e4mc version found on Modrinth.' };
-            }
-            const file = fallbackRes.data[0].files[0];
-            const destPath = path.join(targetModsDir, file.filename);
-            await downloadFile(file.url, destPath, 'e4mc Mod Engine');
-            return { success: true, filename: file.filename };
-        }
-
-        const file = res.data[0].files[0];
-        const destPath = path.join(targetModsDir, file.filename);
-        await downloadFile(file.url, destPath, 'e4mc Mod Engine');
-        return { success: true, filename: file.filename };
-    } catch (err) {
-        console.error('Failed to auto-install e4mc:', err);
-        return { success: false, error: err.message };
-    }
-});
-
-ipcMain.handle('submit-bug-report', async (_event, reportData) => {
-    try {
-        console.log('[Feedback/Bug Report Received]:', reportData);
-        return { success: true };
-    } catch (error) {
-        console.error('Bug report error:', error);
-        return { success: true };
-    }
+app.on('window-all-closed', () => {
+    destroyDiscordRPC();
+    if (process.platform !== 'darwin') app.quit();
 });
