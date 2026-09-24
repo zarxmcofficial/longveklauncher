@@ -8,8 +8,7 @@
 "start": "electron .",
 "build": "electron-builder --win --x64",
 "build:win": "electron-builder --win --x64",
-"build:linux": "electron-builder --linux AppImage deb tar.gz",
-"build:linux:tar": "electron-builder --linux tar.gz",
+"build:linux": "electron-builder --linux AppImage deb",
 "build:all": "electron-builder --win --linux",
 "dist": "electron-builder"
 },
@@ -49,7 +48,7 @@
 {
 "provider": "github",
 "owner": "zarxmcofficial",
-"repo": "longvek-releases"
+"repo": "longveklauncher"
 }
 ],
 "directories": {
@@ -74,8 +73,7 @@
 "linux": {
 "target": [
 "AppImage",
-"deb",
-"tar.gz"
+"deb"
 ],
 "category": "Game",
 "icon": "LONGVEKLAUNCHER.ico",
