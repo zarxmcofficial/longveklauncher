@@ -1070,6 +1070,43 @@
     <!-- Toast Container -->
     <div id="toast-container" class="fixed top-14 right-6 z-[100] flex flex-col gap-2.5 pointer-events-none"></div>
 
+    <!-- AUTO-UPDATE NOTIFICATION BANNER MODAL -->
+    <div id="auto-update-modal" class="fixed bottom-20 right-8 z-[120] bg-surface-900/98 backdrop-blur-2xl border border-brand-400/50 rounded-3xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.85)] max-w-sm w-88 transition-all duration-500 transform translate-y-24 opacity-0 pointer-events-none flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-white/10 pb-2.5">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-brand-500/20 text-brand-300 flex items-center justify-center border border-brand-400/40">
+                    <i class="ph-bold ph-sparkle text-base animate-pulse"></i>
+                </div>
+                <div>
+                    <h4 class="text-xs font-black text-white uppercase tracking-wider font-display" id="update-modal-title">New Update Found!</h4>
+                    <span id="update-modal-ver" class="text-[10px] text-brand-300 font-mono font-bold">v1.1.3</span>
+                </div>
+            </div>
+            <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">AUTO</span>
+        </div>
+
+        <p id="update-modal-desc" class="text-[11px] text-gray-300 leading-relaxed">
+            កំពុងទាញយក Version ថ្មីដោយស្វ័យប្រវត្តិ...
+        </p>
+
+        <!-- Progress Bar -->
+        <div id="update-progress-box" class="flex flex-col gap-1.5">
+            <div class="flex justify-between items-center text-[10px] font-mono">
+                <span class="text-gray-400" id="update-download-status">Downloading...</span>
+                <span id="update-percent-text" class="text-brand-300 font-bold">0%</span>
+            </div>
+            <div class="w-full bg-surface-950 rounded-full h-2 border border-white/10 overflow-hidden">
+                <div id="update-progress-bar" class="h-full bg-gradient-to-r from-brand-500 via-sky-400 to-cyan-300 rounded-full transition-all duration-300 w-0"></div>
+            </div>
+        </div>
+
+        <!-- Action Button (Shown when downloaded 100%) -->
+        <button id="btn-restart-update" onclick="applyUpdateNow()" class="hidden w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(16,185,129,0.35)] active:scale-95 items-center justify-center gap-2">
+            <i class="ph-bold ph-arrows-clockwise text-sm"></i>
+            <span>Restart & Update Now</span>
+        </button>
+    </div>
+
     <!-- SCREENSHOT LIGHTBOX MODAL -->
     <div id="screenshot-lightbox-modal" class="modal-overlay" onclick="closeScreenshotLightbox()">
         <div class="max-w-4xl max-h-[90vh] p-3 flex flex-col items-center gap-3" onclick="event.stopPropagation()">
@@ -3626,6 +3663,64 @@
                         if (progBar) progBar.style.width = percent + '%';
                         if (percentText) percentText.textContent = percent + '%';
                     }
+                });
+            }
+
+            // --- AUTO-UPDATE LISTENERS IN UI ---
+            if (isElectron && window.electronAPI.onUpdateAvailable) {
+                window.electronAPI.onUpdateAvailable((info) => {
+                    const modal = document.getElementById('auto-update-modal');
+                    const verTag = document.getElementById('update-modal-ver');
+                    const desc = document.getElementById('update-modal-desc');
+                    const isKm = currentLang === 'km';
+
+                    if (verTag) verTag.textContent = `v${info.version}`;
+                    if (desc) desc.textContent = isKm ? `បានរកឃើញកំណែថ្មី v${info.version}! កំពុងទាញយកដោយស្វ័យប្រវត្តិ...` : `New version v${info.version} available! Downloading automatically...`;
+
+                    if (modal) {
+                        modal.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+                        modal.classList.add('translate-y-0', 'opacity-100');
+                    }
+                });
+            }
+
+            if (isElectron && window.electronAPI.onUpdateProgress) {
+                window.electronAPI.onUpdateProgress((prog) => {
+                    const percent = Math.min(100, Math.round(prog.percent || 0));
+                    const bar = document.getElementById('update-progress-bar');
+                    const txt = document.getElementById('update-percent-text');
+                    const status = document.getElementById('update-download-status');
+
+                    if (bar) bar.style.width = `${percent}%`;
+                    if (txt) txt.textContent = `${percent}%`;
+                    if (status) {
+                        const speedMB = (prog.bytesPerSecond / (1024 * 1024)).toFixed(1);
+                        status.textContent = `${speedMB} MB/s`;
+                    }
+                });
+            }
+
+            if (isElectron && window.electronAPI.onUpdateDownloaded) {
+                window.electronAPI.onUpdateDownloaded((info) => {
+                    const modal = document.getElementById('auto-update-modal');
+                    const desc = document.getElementById('update-modal-desc');
+                    const progBox = document.getElementById('update-progress-box');
+                    const restartBtn = document.getElementById('btn-restart-update');
+                    const isKm = currentLang === 'km';
+
+                    if (desc) desc.textContent = isKm ? `ទាញយកចប់សព្វគ្រប់! សូមចុចប៊ូតុងខាងក្រោមដើម្បីដំឡើង និងបើក App ឡើងវិញ។` : `Update ready! Click below to restart and apply new version.`;
+                    if (progBox) progBox.classList.add('hidden');
+                    if (restartBtn) {
+                        restartBtn.classList.remove('hidden');
+                        restartBtn.classList.add('flex');
+                    }
+
+                    if (modal) {
+                        modal.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+                        modal.classList.add('translate-y-0', 'opacity-100');
+                    }
+
+                    showToast(isKm ? "Update រួចរាល់" : "Update Ready", isKm ? `បានទាញយក v${info.version} រួចរាល់!` : `Downloaded v${info.version}!`, "success");
                 });
             }
 
@@ -6543,10 +6638,16 @@
         };
 
         window.openScreenshotFolderAction = function() {
-            if (isElectron && window.electronAPI && window.electronAPI.openScreenshotFolder) {
+            if (isElectron && window.electronAPI.openScreenshotFolder) {
                 window.electronAPI.openScreenshotFolder(activeProfileId);
             } else {
                 showToast("Notice", "Requires desktop application to open screenshots folder.", "info");
+            }
+        };
+
+        window.applyUpdateNow = function() {
+            if (isElectron && window.electronAPI.installUpdate) {
+                window.electronAPI.installUpdate();
             }
         };
     </script>
