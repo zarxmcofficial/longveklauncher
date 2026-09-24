@@ -990,19 +990,66 @@ function setActivity(details = 'Main Menu', state = 'Ready to Play') {
 function initAutoUpdater() {
     if (!app.isPackaged) return;
     try {
-        autoUpdater.autoDownload = false;
+        // អនុញ្ញាតឱ្យទាញយក Update ស្វ័យប្រវត្តិកំពូលភ្លាមៗពេលមាន Version ថ្មី
+        autoUpdater.autoDownload = true;
+        autoUpdater.autoInstallOnAppQuit = true;
+
+        autoUpdater.on('checking-for-update', () => {
+            console.log('[AutoUpdater]: Checking for updates on GitHub...');
+        });
+
         autoUpdater.on('update-available', (info) => {
-            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update-available', info);
+            console.log('[AutoUpdater]: Update available:', info.version);
+            sendLogToUI(`New version ${info.version} found! Downloading update...`, 'info');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-available', info);
+            }
         });
+
+        autoUpdater.on('update-not-available', () => {
+            console.log('[AutoUpdater]: App is already on the latest version.');
+        });
+
         autoUpdater.on('download-progress', (progress) => {
-            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update-progress', progress);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-progress', progress);
+            }
         });
+
         autoUpdater.on('update-downloaded', (info) => {
-            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update-downloaded', info);
+            console.log('[AutoUpdater]: Update downloaded successfully:', info.version);
+            sendLogToUI(`Update ${info.version} downloaded! Restarting to apply...`, 'success');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-downloaded', info);
+            }
+            // ដំឡើង update ស្វ័យប្រវត្តិពេលបិទ ឬចុច install
         });
-        autoUpdater.checkForUpdates().catch(err => console.warn('Auto-updater error:', err.message));
-    } catch (e) {}
+
+        autoUpdater.on('error', (err) => {
+            console.warn('[AutoUpdater Error]:', err.message);
+        });
+
+        // ចាប់ផ្តើមត្រួតពិនិត្យ Update ពី GitHub ស្វ័យប្រវត្តិ
+        autoUpdater.checkForUpdatesAndNotify().catch(err => console.warn('Auto-updater check error:', err.message));
+    } catch (e) {
+        console.warn('Auto-updater init error:', e.message);
+    }
 }
+
+// IPCs សម្រាប់ចុច Check Update & Install ដោយផ្ទាល់ដៃ
+ipcMain.on('check-for-updates', () => {
+    if (app.isPackaged) {
+        autoUpdater.checkForUpdates().catch(() => {});
+    }
+});
+
+ipcMain.on('install-update', () => {
+    try {
+        autoUpdater.quitAndInstall(false, true);
+    } catch (e) {
+        console.warn('Quit and install error:', e.message);
+    }
+});
 
 function createSplashWindow() {
     if (splashWindow && !splashWindow.isDestroyed()) return;
