@@ -454,28 +454,28 @@
                             <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"></div>
                             <h4 class="text-[11px] font-black text-white uppercase tracking-wider font-display" id="lbl-latest-news">Latest Updates</h4>
                         </div>
-                        <span class="text-[9px] font-black px-2 py-0.5 rounded-md bg-brand-500/25 text-brand-300 border border-brand-400/40">v2.5 PRO</span>
+                        <span class="text-[9px] font-black px-2 py-0.5 rounded-md bg-brand-500/25 text-brand-300 border border-brand-400/40">v2.0 PRO</span>
                     </div>
 
                     <!-- Changelog Teaser Item -->
                     <div class="flex flex-col gap-2.5 cursor-pointer group" onclick="openChangelogModal()">
                         <div class="flex items-start gap-3">
-                            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600/40 to-sky-400/20 flex items-center justify-center text-brand-300 border border-brand-500/40 shrink-0 group-hover:scale-105 group-hover:shadow-[0_0_15px_rgba(56,189,248,0.4)] transition-all">
-                                <i class="ph-fill ph-sparkle text-xl"></i>
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600/40 to-sky-400/20 flex items-center justify-center text-cyan-300 border border-cyan-500/40 shrink-0 group-hover:scale-105 group-hover:shadow-[0_0_15px_rgba(56,189,248,0.4)] transition-all">
+                                <i class="ph-fill ph-shield-star text-xl"></i>
                             </div>
                             <div class="flex-1 overflow-hidden">
                                 <div class="flex items-center gap-1.5">
-                                    <h5 class="text-xs font-black text-white group-hover:text-brand-300 transition-colors line-clamp-1 font-display" id="news-teaser-title">New Cyber UI & 3D Suite</h5>
+                                    <h5 class="text-xs font-black text-white group-hover:text-brand-300 transition-colors line-clamp-1 font-display" id="news-teaser-title">Official Capes & In-Game Sync</h5>
                                     <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
                                 </div>
-                                <p class="text-[10px] text-gray-400 line-clamp-2 mt-0.5 leading-relaxed" id="news-teaser-desc">3D Pose controls, fast profile manager, live skin preview & full version catalog.</p>
+                                <p class="text-[10px] text-gray-400 line-clamp-2 mt-0.5 leading-relaxed" id="news-teaser-desc">Official Master, V1, V2, V6 Capes with real-time 3D preview and automatic in-game injection.</p>
                             </div>
                         </div>
 
                         <div class="flex items-center gap-1.5 pt-1 border-t border-white/5">
-                            <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-surface-950 text-emerald-400 border border-emerald-500/30" id="badge-3d">✨ 3D Controls</span>
-                            <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-surface-950 text-cyan-300 border border-cyan-400/30" id="badge-prof">⚡ Profiles</span>
-                            <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-surface-950 text-amber-300 border border-amber-400/30" id="badge-ms">🛡️ MS Auth</span>
+                            <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-surface-950 text-cyan-300 border border-cyan-400/30" id="badge-3d">🛡️ Official Capes</span>
+                            <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-surface-950 text-emerald-400 border border-emerald-500/30" id="badge-prof">✨ In-Game Sync</span>
+                            <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-surface-950 text-amber-300 border border-amber-400/30" id="badge-ms">⚡ 3D Preview</span>
                         </div>
                     </div>
                 </div>
@@ -684,7 +684,7 @@
                             </div>
 
                             <!-- Capes Grid View -->
-                            <div id="wardrobe-capes-panel" class="hidden flex-col h-full">
+                            <div id="wardrobe-capes-panel" class="hidden flex-col h-full overflow-y-auto pr-1">
                                 <div class="flex justify-between items-center mb-3 border-b border-white/10 pb-2.5">
                                     <div class="flex items-center gap-2">
                                         <div class="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center border border-cyan-400/30">
@@ -694,7 +694,7 @@
                                     </div>
                                     <span class="text-[9px] font-bold text-cyan-300 uppercase tracking-widest">REAL-TIME 3D SYNC</span>
                                 </div>
-                                <div id="capes-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-1 flex-1 content-start"></div>
+                                <div id="capes-grid" class="flex flex-col gap-3 pb-4"></div>
                             </div>
                         </div>
                     </div>
@@ -987,13 +987,10 @@
                                         <span id="profiles-count-badge" class="text-[9px] bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-bold border border-brand-500/30">1 Active</span>
                                     </div>
                                     <div class="flex items-center gap-1.5">
-                                        <button onclick="restoreDefaultProfile()" class="text-[10px] bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-400/30 font-black px-2 py-1 rounded-xl transition-all shadow-sm flex items-center gap-1" title="Restore Default Profile (Vanilla 1.21.1)">
-                                            <i class="ph-fill ph-star text-xs"></i> <span>Default</span>
-                                        </button>
                                         <button onclick="openManageProfilesModal()" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors" title="Manage Profiles">
                                             <i class="ph-fill ph-gear text-xs"></i>
                                         </button>
-                                        <button onclick="openProfileModal()" class="text-[10px] bg-gradient-to-r from-brand-500 to-sky-400 hover:from-brand-400 hover:to-sky-300 text-slate-950 font-black px-2.5 py-1 rounded-xl transition-all shadow-md flex items-center gap-1">
+                                        <button onclick="openProfileModal()" class="text-[10px] bg-gradient-to-r from-brand-500 to-sky-400 hover:from-brand-400 hover:to-sky-300 text-slate-950 font-black px-2.5 py-1 rounded-xl transition-all shadow-md flex items-center gap-1 shrink-0">
                                             <i class="ph-bold ph-plus"></i> NEW
                                         </button>
                                     </div>
@@ -1770,7 +1767,7 @@
                     <div>
                         <div class="flex items-center gap-2">
                             <h3 class="text-base font-black text-white uppercase tracking-wider font-display">Changelog & New Features</h3>
-                            <span class="text-[9px] font-black px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v2.5 UPDATE</span>
+                            <span class="text-[9px] font-black px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v2.0 UPDATE</span>
                         </div>
                         <p class="text-[10px] text-gray-400 font-medium">Discover what's new in the latest LONGVEK LAUNCHER update</p>
                     </div>
@@ -1781,47 +1778,47 @@
             </div>
 
             <div class="p-6 overflow-y-auto max-h-[68vh] flex flex-col gap-4">
-                <div class="glass-card p-4 rounded-2xl border border-sky-400/30 bg-gradient-to-r from-sky-950/30 via-surface-900/80 to-surface-900 flex items-start gap-3.5">
-                    <div class="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-300 border border-sky-400/40 shrink-0">
-                        <i class="ph-fill ph-user-focus text-xl"></i>
+                <div class="glass-card p-4 rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-cyan-950/30 via-surface-900/80 to-surface-900 flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-300 border border-cyan-400/40 shrink-0">
+                        <i class="ph-fill ph-shield-star text-xl"></i>
                     </div>
                     <div>
                         <h4 class="text-xs font-black text-white uppercase tracking-wider font-display flex items-center gap-2">
-                            <span id="cl-feat1-title">🧍 3D Character Pose & Stance Controller</span>
-                            <span class="text-[8px] bg-sky-500/20 text-sky-300 px-1.5 py-0.2 rounded font-bold border border-sky-400/30">NEW</span>
+                            <span id="cl-feat1-title">🛡️ Official Capes Suite (Master, V1, V2, V6)</span>
+                            <span class="text-[8px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.2 rounded font-bold border border-cyan-400/30">NEW</span>
                         </h4>
                         <p class="text-[11px] text-gray-300 leading-relaxed mt-1" id="cl-feat1-desc">
-                            Natural breathing idle animation with dynamic floating toolbar to toggle Idle, Walk, Run and 360° Rotate.
+                            Official LONGVEK Master Cape and V-series capes with real-time 3D back-inspection and automatic in-game injection via CustomSkinLoader.
                         </p>
                     </div>
                 </div>
 
                 <div class="glass-card p-4 rounded-2xl border border-brand-400/30 bg-gradient-to-r from-brand-950/30 via-surface-900/80 to-surface-900 flex items-start gap-3.5">
                     <div class="w-10 h-10 rounded-xl bg-brand-500/20 flex items-center justify-center text-brand-300 border border-brand-400/40 shrink-0">
-                        <i class="ph-fill ph-stack text-xl"></i>
+                        <i class="ph-fill ph-user-focus text-xl"></i>
                     </div>
                     <div>
                         <h4 class="text-xs font-black text-white uppercase tracking-wider font-display flex items-center gap-2">
-                            <span id="cl-feat2-title">🎮 Full Minecraft Version Library & Profiles</span>
-                            <span class="text-[8px] bg-brand-500/20 text-brand-300 px-1.5 py-0.2 rounded font-bold border border-brand-400/30">POWERFUL</span>
+                            <span id="cl-feat2-title">🧍 3D Character Pose & Stance Controller</span>
+                            <span class="text-[8px] bg-brand-500/20 text-brand-300 px-1.5 py-0.2 rounded font-bold border border-brand-400/30">HOT</span>
                         </h4>
                         <p class="text-[11px] text-gray-300 leading-relaxed mt-1" id="cl-feat2-desc">
-                            Complete Minecraft library from 1.21.4 down to 1.8.9 supporting Fabric, Forge, OptiFine & Vanilla with instant search & inline profile delete.
+                            Natural breathing idle animation with dynamic floating toolbar to toggle Idle, Walk, Run and 360° Rotate.
                         </p>
                     </div>
                 </div>
 
                 <div class="glass-card p-4 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-surface-900/80 to-surface-900 flex items-start gap-3.5">
                     <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/40 shrink-0">
-                        <i class="ph-fill ph-shield-check text-xl"></i>
+                        <i class="ph-fill ph-stack text-xl"></i>
                     </div>
                     <div>
                         <h4 class="text-xs font-black text-white uppercase tracking-wider font-display flex items-center gap-2">
-                            <span id="cl-feat3-title">🛡️ Microsoft Official 4-Color Auth & Live Skin Preview</span>
-                            <span class="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-500/30">SECURE</span>
+                            <span id="cl-feat3-title">🎮 Full Version Library & Profiles</span>
+                            <span class="text-[8px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">STABLE</span>
                         </h4>
                         <p class="text-[11px] text-gray-300 leading-relaxed mt-1" id="cl-feat3-desc">
-                            VIP connect account suite with official 4-color Microsoft branding and real-time live avatar preview upon typing username.
+                            Complete Minecraft library from 1.21.4 down to 1.8.9 supporting Fabric, Forge, OptiFine & Vanilla with instant search & inline profile delete.
                         </p>
                     </div>
                 </div>
@@ -1897,32 +1894,48 @@
         let currentLang = localStorage.getItem('longvek_lang') || 'en';
         let installedMods = JSON.parse(localStorage.getItem('longvek_installed_mods') || '[]');
 
+        function normalizeCapeUrl(url) {
+            if (!url || typeof url !== 'string') return '';
+            // បំលែង https://github.com/user/repo/blob/main/lv.png -> https://raw.githubusercontent.com/user/repo/main/lv.png
+            if (url.includes('github.com') && url.includes('/blob/')) {
+                return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+            }
+            return url.trim();
+        }
+
         const OFFICIAL_CAPES = [
             {
-                name: "LONGVEK Champion HD",
-                id: "lvcapes",
-                url: "https://cdn.jsdelivr.net/gh/zarxmcofficial/longvekmccapes@main/lvcapes.png",
-                fallbackUrl: "https://raw.githubusercontent.com/zarxmcofficial/longvekmccapes/main/lvcapes.png",
+                name: "LONGVEK Classic Cape (V1)",
+                id: "longveklv",
+                url: normalizeCapeUrl("https://github.com/zarxmcofficial/longvekmccape/blob/main/lv7.png"),
+                fallbackUrl: "https://cdn.jsdelivr.net/gh/zarxmcofficial/longvekmccape@main/lv7.png",
                 accent: "#38bdf8",
-                tag: "CHAMPION"
+                tag: "OFFICIAL V1"
             },
             {
-                name: "LONGVEK Mystic HD",
-                id: "vlcapes1",
-                url: "https://cdn.jsdelivr.net/gh/zarxmcofficial/longvekmccapes@main/vlcapes1.png",
-                fallbackUrl: "https://raw.githubusercontent.com/zarxmcofficial/longvekmccapes/main/vlcapes1.png",
-                accent: "#818cf8",
-                tag: "MYSTIC"
+                name: "LONGVEK Cyber Cape (V2)",
+                id: "longveklv2",
+                url: normalizeCapeUrl("https://github.com/zarxmcofficial/longvekmccape/blob/main/vl8.png"),
+                fallbackUrl: "https://cdn.jsdelivr.net/gh/zarxmcofficial/longvekmccape@main/vl8.png",
+                accent: "#0ea5e9",
+                tag: "OFFICIAL V2"
             },
             {
-                name: "LONGVEK Special HD",
-                id: "vlcapes2",
-                url: "https://cdn.jsdelivr.net/gh/zarxmcofficial/longvekmccapes@main/vlcapes2.png",
-                fallbackUrl: "https://raw.githubusercontent.com/zarxmcofficial/longvekmccapes/main/vlcapes2.png",
+                name: "LONGVEK Mythic Cape (V6)",
+                id: "longveklv6",
+                url: normalizeCapeUrl("https://github.com/zarxmcofficial/longvekmccape/blob/main/lv6.png"),
+                fallbackUrl: "https://cdn.jsdelivr.net/gh/zarxmcofficial/longvekmccape@main/lv6.png",
                 accent: "#f59e0b",
-                tag: "SPECIAL"
+                tag: "MYTHIC V6"
             }
         ];
+
+        // ស្វ័យប្រវត្តិកែតម្រូវ Cache ក្នុង LocalStorage ប្រសិនបើធ្លាប់ជាប់ Link ខូចដូចជា mccapes.png
+        const validDefaultCapeUrl = OFFICIAL_CAPES[0].url;
+        if (activeCape && (activeCape.includes('mccapes') || activeCape.includes('longvekcapes'))) {
+            activeCape = validDefaultCapeUrl;
+            localStorage.setItem('longvek_active_cape', validDefaultCapeUrl);
+        }
 
         // គូររូបភាព Cape Preview លើ Canvas នីមួយៗឱ្យចេញច្បាស់ និងមិនទទេស្អាត
         window.drawCapeThumbnail = function(canvas, cape) {
@@ -1941,14 +1954,7 @@
             ctx.fillStyle = grad;
             ctx.fillRect(2, 2, canvas.width - 4, canvas.height - 4);
 
-            // គូរស្លាកសញ្ញាដាវ និងខែលលើ Cape Preview
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(Math.floor(canvas.width / 2) - 1, 10, 2, canvas.height - 24);
-            ctx.fillRect(Math.floor(canvas.width / 2) - 6, 16, 12, 2);
-            ctx.fillStyle = cape.accent || '#38bdf8';
-            ctx.fillRect(Math.floor(canvas.width / 2) - 3, 20, 6, 10);
-
-            // 2. ទាញយករូបភាព Cape ដើមពិតប្រាកដមកគូរជំនួស
+            // 2. ទាញយករូបភាព Cape ដើមពិតប្រាកដមកគូរ
             const img = new Image();
             img.crossOrigin = "anonymous";
             let triedFallback = false;
@@ -1979,8 +1985,17 @@
                 }
             };
 
-            // សាកល្បងហៅតាម local proxy ឬ fallback URL បើ VPS មិនទាន់ online
-            img.src = cape.url;
+            // ប្រើ Backend Fetch Base64 ដើម្បីកុំឱ្យជាប់បញ្ហា CORS លើ Canvas
+            if (isElectron && window.electronAPI && window.electronAPI.fetchImageBase64) {
+                window.electronAPI.fetchImageBase64(cape.url).then(b64 => {
+                    if (b64) img.src = b64;
+                    else img.src = cape.url;
+                }).catch(() => {
+                    img.src = cape.url;
+                });
+            } else {
+                img.src = cape.url;
+            }
         };
 
         window.renderCapesGrid = function() {
@@ -1991,28 +2006,72 @@
             const t = translations[currentLang] || translations.en;
 
             OFFICIAL_CAPES.forEach((cape, index) => {
-                const isEquipped = activeCape === cape.url;
+                const isEquipped = activeCape === cape.url || activeCape === cape.fallbackUrl;
                 const borderClass = isEquipped 
-                    ? 'border-cyan-400 bg-cyan-500/20 shadow-[0_0_18px_rgba(34,211,238,0.4)]' 
-                    : 'border-white/10 bg-surface-950/60 hover:border-cyan-400/50';
+                    ? 'border-cyan-400 bg-cyan-950/30 shadow-[0_0_20px_rgba(34,211,238,0.25)]' 
+                    : 'border-white/10 bg-surface-950/70 hover:border-cyan-400/50';
 
                 grid.innerHTML += `
-                    <div onclick="applyCape('${cape.url}', '${cape.name}')" 
-                         class="rounded-2xl border ${borderClass} p-3 cursor-pointer group flex flex-col justify-between transition-all hover:scale-[1.02] relative overflow-hidden h-44 shadow-lg">
-                        <div class="flex justify-between items-start z-10 w-full">
-                            <span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-950/80 text-cyan-300 border border-cyan-400/30">${cape.tag || 'OFFICIAL'}</span>
-                            ${isEquipped ? `<span class="text-[8px] font-black uppercase text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30">${t.capeTagEquipped || 'EQUIPPED'}</span>` : ''}
-                        </div>
+                    <div class="rounded-2xl border ${borderClass} p-4 transition-all duration-300 relative overflow-hidden flex flex-col sm:flex-row gap-4 items-center justify-between">
                         
-                        <div class="w-full flex-1 flex items-center justify-center my-1 z-10 relative">
-                            <div class="relative p-1 rounded-xl bg-surface-950/90 border border-white/10 group-hover:border-cyan-400/60 shadow-inner group-hover:scale-105 transition-transform duration-300">
-                                <canvas id="cape-thumb-${index}" width="42" height="66" class="w-[42px] h-[66px] block rounded object-contain filter drop-shadow-[0_6px_12px_rgba(0,0,0,0.8)]"></canvas>
+                        <!-- Left Info & Preview Texture -->
+                        <div class="flex items-center gap-4 w-full sm:w-auto">
+                            <!-- 2D Cape Texture Frame (Sleek Modern Border) -->
+                            <div class="w-20 h-28 rounded-xl overflow-hidden border border-white/15 bg-surface-950 flex items-center justify-center shadow-inner shrink-0 group relative">
+                                <canvas id="cape-thumb-${index}" width="80" height="128" class="w-full h-full object-contain"></canvas>
+                                <div class="absolute inset-0 bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                            </div>
+
+                            <div class="flex flex-col">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-surface-900 text-cyan-300 border border-cyan-400/30">
+                                        ${cape.tag}
+                                    </span>
+                                    <span class="text-[9px] font-bold text-gray-400 font-mono">64x32 HD</span>
+                                </div>
+                                <h3 class="text-sm font-black text-white mt-1 group-hover:text-cyan-300 transition-colors font-display">${cape.name}</h3>
+                                <p class="text-[10px] text-gray-400 mt-0.5 leading-relaxed max-w-sm">
+                                    ${currentLang === 'km' 
+                                        ? 'អាវឃ្លុំផ្លូវការរបស់ LONGVEK បង្ហាញក្នុងហ្គេម និងធ្វើសមកាលកម្ម 3D ស្វ័យប្រវត្តិ។' 
+                                        : 'LONGVEK Official Cape with automatic In-Game injection & real-time 3D sync.'}
+                                </p>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <span class="text-[9px] font-bold px-2 py-0.5 rounded-md bg-surface-900 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                        <i class="ph-bold ph-check"></i> In-Game Active
+                                    </span>
+                                    <span class="text-[9px] font-bold px-2 py-0.5 rounded-md bg-surface-900 text-cyan-300 border border-cyan-400/30 flex items-center gap-1">
+                                        <i class="ph-bold ph-shield-check"></i> CustomSkinLoader
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="z-10 flex flex-col w-full">
-                            <span class="text-xs font-black text-white truncate text-center font-display">${cape.name}</span>
-                            <span class="text-[9px] font-bold text-gray-400 mt-0.5 text-center group-hover:text-cyan-300 transition-colors">${isEquipped ? 'Active on Character' : (t.capeClickEquip || 'Click to equip')}</span>
+                        <!-- Right Action Controls -->
+                        <div class="flex flex-col sm:items-end gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                            ${isEquipped ? `
+                                <div class="flex items-center gap-2">
+                                    <span class="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                                        <i class="ph-bold ph-check-circle text-xs"></i> EQUIPPED
+                                    </span>
+                                    <button onclick="removeActiveCape()" class="px-2.5 py-1.5 rounded-xl bg-surface-900 hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-white/10 text-[10px] font-black uppercase transition-all flex items-center gap-1" title="Unequip">
+                                        <i class="ph-bold ph-x"></i>
+                                    </button>
+                                </div>
+                                <button onclick="toggleWardrobeFacing()" class="px-3 py-1.5 rounded-xl bg-surface-900 hover:bg-white/10 text-cyan-300 border border-cyan-400/30 text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5">
+                                    <i class="ph-bold ph-arrows-clockwise"></i>
+                                    <span id="btn-toggle-facing-text">${currentLang === 'km' ? 'បង្វិលមើលតួអង្គ' : 'Turn Character'}</span>
+                                </button>
+                            ` : `
+                                <button onclick="applyCape('${cape.url}', '${cape.name}')" 
+                                        class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-400 hover:from-cyan-400 hover:to-sky-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(34,211,238,0.4)] active:scale-95 flex items-center justify-center gap-2">
+                                    <i class="ph-bold ph-lightning text-sm"></i>
+                                    <span>${currentLang === 'km' ? 'ពាក់អាវឃ្លុំ' : 'Equip Cape'}</span>
+                                </button>
+                                <button onclick="toggleWardrobeFacing()" class="px-3 py-1.5 rounded-xl bg-surface-900 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5">
+                                    <i class="ph-bold ph-arrows-clockwise"></i>
+                                    <span>${currentLang === 'km' ? 'បង្វិលមើលខ្នង' : 'Inspect Back'}</span>
+                                </button>
+                            `}
                         </div>
                     </div>
                 `;
@@ -2024,6 +2083,14 @@
                     if (canvas) drawCapeThumbnail(canvas, cape);
                 });
             }, 30);
+        };
+
+        window.toggleWardrobeFacing = function() {
+            if (!wardrobeSkinViewer || !wardrobeSkinViewer.playerObject) return;
+            const currentRotation = wardrobeSkinViewer.playerObject.rotation.y;
+            // Toggle between front facing (0) and back facing (Math.PI)
+            const targetRotation = Math.abs(currentRotation - Math.PI) < 0.2 ? 0 : Math.PI;
+            wardrobeSkinViewer.playerObject.rotation.y = targetRotation;
         };
 
         window.switchWardrobeSubTab = function(subTab) {
@@ -2112,25 +2179,31 @@
                     const h = img.naturalHeight || img.height;
                     const ratio = w / h;
 
-                    if (ratio >= 1.8 && ratio <= 2.2) {
-                        resolve(source);
-                        return;
-                    }
-
                     const canvas = document.createElement('canvas');
-                    canvas.width = 512;
-                    canvas.height = 256;
                     const ctx = canvas.getContext('2d');
                     ctx.imageSmoothingEnabled = false;
 
-                    const sx = Math.round((1 / 64) * 512);
-                    const sy = Math.round((1 / 32) * 256);
-                    const sw = Math.round((10 / 64) * 512);
-                    const sh = Math.round((16 / 32) * 256);
-                    const sxInner = Math.round((12 / 64) * 512);
+                    if (ratio >= 1.8 && ratio <= 2.2) {
+                        canvas.width = w;
+                        canvas.height = h;
+                        ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                        return;
+                    }
 
-                    ctx.drawImage(img, 0, 0, w, h, sx, sy, sw, sh);
-                    ctx.drawImage(img, 0, 0, w, h, sxInner, sy, sw, sh);
+                    // Format 2D image directly onto 512x256 HD Minecraft Cape UV Template
+                    canvas.width = 512;
+                    canvas.height = 256;
+                    ctx.clearRect(0, 0, 512, 256);
+
+                    // Base border & edge background
+                    ctx.fillStyle = '#0b1329';
+                    ctx.fillRect(0, 0, 180, 140);
+
+                    // Back of cape (Main view from behind): UV x=8, y=8, w=80, h=128
+                    ctx.drawImage(img, 8, 8, 80, 128);
+                    // Front of cape (Facing player body): UV x=96, y=8, w=80, h=128
+                    ctx.drawImage(img, 96, 8, 80, 128);
 
                     resolve(canvas.toDataURL('image/png'));
                 };
@@ -2731,11 +2804,11 @@
                 fpsBoostSuccessTitle: "FPS Boost Activated!",
                 fpsBoostSuccessDesc: "Safe memory allocation and high performance flags applied.",
                 lblNews: "Latest Updates",
-                newsTeaserTitle: "New Cyber UI & 3D Suite",
-                newsTeaserDesc: "3D Pose controls, fast profile manager, live skin preview & full version catalog.",
-                badge3d: "✨ 3D Controls",
-                badgeProf: "⚡ Profiles",
-                badgeMs: "🛡️ MS Auth",
+                newsTeaserTitle: "Official Capes & In-Game Sync",
+                newsTeaserDesc: "Official Master, V1, V2, V6 Capes with real-time 3D preview and automatic in-game injection.",
+                badge3d: "🛡️ Official Capes",
+                badgeProf: "✨ In-Game Sync",
+                badgeMs: "⚡ 3D Preview",
                 noAccount: "NO ACCOUNT CONNECTED",
                 noAccountDesc: "Click here or Avatar to Login / Add Account",
                 totalPlaytime: "Total Playtime",
@@ -2804,12 +2877,12 @@
                 roleBuild: "🔨 Builder & Architect",
                 roleMini: "🎮 Casual & Minigames",
                 createConnect: "Create & Connect",
-                clFeat1Title: "🧍 3D Character Pose & Stance Controller",
-                clFeat1Desc: "Natural breathing idle animation with dynamic floating toolbar to toggle Idle, Walk, Run and 360° Rotate.",
-                clFeat2Title: "🎮 Full Minecraft Version Library & Profiles",
-                clFeat2Desc: "Complete Minecraft library from 1.21.4 down to 1.8.9 supporting Fabric, Forge, OptiFine & Vanilla with instant search & inline profile delete.",
-                clFeat3Title: "🛡️ Microsoft Official 4-Color Auth & Live Skin Preview",
-                clFeat3Desc: "VIP connect account suite with official 4-color Microsoft branding and real-time live avatar preview upon typing username.",
+                clFeat1Title: "🛡️ Official Capes Suite (Master, V1, V2, V6)",
+                clFeat1Desc: "Official LONGVEK Master Cape and V-series capes with real-time 3D back-inspection and automatic in-game injection via CustomSkinLoader.",
+                clFeat2Title: "🧍 3D Character Pose & Stance Controller",
+                clFeat2Desc: "Natural breathing idle animation with dynamic floating toolbar to toggle Idle, Walk, Run and 360° Rotate.",
+                clFeat3Title: "🎮 Full Version Library & Profiles",
+                clFeat3Desc: "Complete Minecraft library from 1.21.4 down to 1.8.9 supporting Fabric, Forge, OptiFine & Vanilla with instant search & inline profile delete.",
                 clFeat4Title: "✨ Cyber-Glass UI & Smooth Page Transitions",
                 clFeat4Desc: "Frosted cyber dock navigation, independent multi-language tooltips, and smooth page transitions with zero stutter.",
                 btnRotate: "Rotate 360°",
@@ -2878,11 +2951,11 @@
                 fpsBoostSuccessTitle: "ជំរុញ FPS រួចរាល់!",
                 fpsBoostSuccessDesc: "បានបញ្ចូលកូដបង្កើន FPS និងកំណត់ទំហំ RAM សុវត្ថិភាពដោយជោគជ័យ។",
                 lblNews: "ព័ត៌មានថ្មីៗ",
-                newsTeaserTitle: "រូបរាង Cyber UI & ប្រព័ន្ធ 3D ថ្មី",
-                newsTeaserDesc: "ផ្ទាំងបញ្ជាចលនា 3D, គ្រប់គ្រង Profile លឿនរហ័ស, Live Skin Preview និងបណ្ណាល័យ Version គ្រប់ស៊េរី។",
-                badge3d: "✨ បញ្ជាចលនា 3D",
-                badgeProf: "⚡ ប្រូហ្វាល់",
-                badgeMs: "🛡️ MS Auth",
+                newsTeaserTitle: "អាវឃ្លុំ Cape ផ្លូវការ & In-Game Sync",
+                newsTeaserDesc: "អាវឃ្លុំ Cape ផ្លូវការ Master & V-Series, បង្ហាញលើតួអង្គ 3D និងចាក់បញ្ចូលក្នុងហ្គេមស្វ័យប្រវត្តិ។",
+                badge3d: "🛡️ Cape ផ្លូវការ",
+                badgeProf: "✨ Sync ក្នុងហ្គេម",
+                badgeMs: "⚡ 3D Preview",
                 noAccount: "មិនទាន់មានគណនី",
                 noAccountDesc: "ចុចទីនេះ ឬរូប Avatar ដើម្បីចូល ឬបន្ថែមគណនី",
                 totalPlaytime: "ម៉ោងលេងសរុប",
@@ -2898,7 +2971,6 @@
                 serversSubtitle: "Server ផ្លូវការរបស់ LONGVEK និងសហគមន៍កម្ពុជា។",
                 serverCardDesc: "Survival • Lifesteal SMP • Minigames | គាំទ្រកំណែ 1.8.9 - 1.20+",
                 btnPlayServer: "ឆាប់ៗនេះ",
-                // P2P Friend Worlds Keys (KM)
                 subtabOfficial: "ម៉ាស៊ីនមេផ្លូវការ",
                 subtabP2p: "ពិភពលោកមិត្តភក្តិ P2P",
                 p2pBannerTitle: "បណ្តាញ P2P Mesh • ភ្ជាប់ជាមួយ e4mc",
@@ -2952,12 +3024,12 @@
                 roleBuild: "🔨 ស្ថាបត្យករ & សាងសង់",
                 roleMini: "🎮 លេងកម្សាន្ត & Minigames",
                 createConnect: "បង្កើត & ភ្ជាប់គណនី",
-                clFeat1Title: "🧍 ផ្ទាំងបញ្ជាកាយវិការតួអង្គ 3D",
-                clFeat1Desc: "តួអង្គ 3D ឈរដកដង្ហើមស្ងៀមបែបធម្មជាតិ រួមជាមួយ Floating Toolbar សម្រាប់ចុចប្តូរចលនា ឈរ, ដើរ, រត់ និងបង្វិល 360° ភ្លាមៗ។",
-                clFeat2Title: "🎮 បណ្ណាល័យ Version & Profile ពេញលេញ",
-                clFeat2Desc: "បណ្ណាល័យ Minecraft Version ពេញលេញពី 1.21.4 ដល់ 1.8.9 គាំទ្រ Fabric, Forge, OptiFine និង Vanilla ជាមួយ Search Bar និងប៊ូតុងលុប Profile រហ័ស។",
-                clFeat3Title: "🛡️ Microsoft Auth ៤ ពណ៌ & Live Skin Preview",
-                clFeat3Desc: "ផ្ទាំងភ្ជាប់គណនី VIP បំពាក់ Logo Microsoft ៤ ពណ៌ផ្លូវការ និងប្រព័ន្ធបង្ហាញ Skin ភ្លាមៗពេលវាយឈ្មោះ Minecraft។",
+                clFeat1Title: "🛡️ ប្រព័ន្ធ Cape ផ្លូវការ (Master, V1, V2, V6)",
+                clFeat1Desc: "អាវឃ្លុំ Cape ផ្លូវការ Master Cape និង V-Series អាចបង្វិលពិនិត្យខ្នង 3D និងចាក់បញ្ចូលចូលក្នុងហ្គេម Minecraft ស្វ័យប្រវត្តិតាម CustomSkinLoader។",
+                clFeat2Title: "🧍 ផ្ទាំងបញ្ជាកាយវិការតួអង្គ 3D",
+                clFeat2Desc: "តួអង្គ 3D ឈរដកដង្ហើមស្ងៀមបែបធម្មជាតិ រួមជាមួយ Floating Toolbar សម្រាប់ចុចប្តូរចលនា ឈរ, ដើរ, រត់ និងបង្វិល 360° ភ្លាមៗ។",
+                clFeat3Title: "🎮 បណ្ណាល័យ Version & Profile ពេញលេញ",
+                clFeat3Desc: "បណ្ណាល័យ Minecraft Version ពេញលេញពី 1.21.4 ដល់ 1.8.9 គាំទ្រ Fabric, Forge, OptiFine និង Vanilla ជាមួយ Search Bar និងប៊ូតុងលុប Profile រហ័ស។",
                 clFeat4Title: "✨ Cyber-Glass UI & ចលនារលូនគ្មានគាំង",
                 clFeat4Desc: "Side-Dock បែបកញ្ចក់ថ្លាទំនើប, Tooltips បំបែកភាសាដាច់ពីគ្នា ១០០% និងចលនាប្តូរផ្ទាំងទន់រលូន។",
                 changelogFooter: "បណ្តាញ LONGVEK • កម្មវិធី Launcher ផ្លូវការកម្ពុជា",
@@ -3271,6 +3343,11 @@
             const btnRemoveCape = document.getElementById('btn-remove-cape');
             if (btnRemoveCape) {
                 btnRemoveCape.innerHTML = `<i class="ph-bold ph-x"></i> ${t.btnRemoveCape || (lang === 'km' ? 'ដោះ Cape ចេញ' : 'Remove Active Cape')}`;
+            }
+
+            const btnToggleFacing = document.getElementById('btn-toggle-facing-text');
+            if (btnToggleFacing) {
+                btnToggleFacing.textContent = lang === 'km' ? 'បង្វិលមើលតួអង្គ (មុខ / ក្រោយ)' : 'Turn Character (Back / Front)';
             }
 
             renderCapesGrid();
@@ -3616,33 +3693,51 @@
 
                     if (data.status === 'success') {
                         resetMsButton();
-                        // បិទផ្ទាំង Connect Account ចូលវិញភ្លាមៗ
                         closeAuthModal();
 
                         try {
                             const newAcc = data.account;
-                            const exists = accounts.find(a => a.id === newAcc.id || a.name.toLowerCase() === newAcc.name.toLowerCase());
+                            const existsIndex = accounts.findIndex(a => a.id === newAcc.id || a.name.toLowerCase() === newAcc.name.toLowerCase());
                             const archivedSec = getArchivedPlaytime(newAcc.name, newAcc.id);
                             
-                            if (exists) {
-                                Object.assign(exists, newAcc);
-                                if ((exists.playtimeSeconds || 0) < archivedSec) {
-                                    exists.playtimeSeconds = archivedSec;
-                                    exists.playtimeMins = Math.round((archivedSec / 60) * 10) / 10;
+                            if (existsIndex !== -1) {
+                                accounts[existsIndex] = Object.assign({}, accounts[existsIndex], newAcc);
+                                if ((accounts[existsIndex].playtimeSeconds || 0) < archivedSec) {
+                                    accounts[existsIndex].playtimeSeconds = archivedSec;
+                                    accounts[existsIndex].playtimeMins = Math.round((archivedSec / 60) * 10) / 10;
                                 }
                             } else {
                                 if (archivedSec > 0) {
                                     newAcc.playtimeSeconds = archivedSec;
                                     newAcc.playtimeMins = Math.round((archivedSec / 60) * 10) / 10;
                                 }
-                                accounts.push(newAcc);
+                                accounts.unshift(newAcc);
                             }
+
                             activeAccountId = newAcc.id; 
                             localStorage.setItem('longvek_active_account_id', activeAccountId);
+                            currentUser = newAcc;
                             saveAccounts(); 
-                            currentUser = accounts.find(a => a.id === activeAccountId) || newAcc; 
+                            
                             renderAccountList(); 
                             updateUIForActiveAccount();
+
+                            // ធានាថាតួអង្គ 3D លោតមកភ្លាមៗនៅលើទំព័រដើម
+                            const skinCanvas = document.getElementById('skin-canvas');
+                            const emptyState = document.getElementById('hologram-empty-state');
+                            if (emptyState) emptyState.classList.add('hidden');
+                            if (skinCanvas) {
+                                skinCanvas.classList.remove('hidden');
+                                skinCanvas.classList.remove('opacity-0');
+                            }
+
+                            if (mainSkinViewer) {
+                                const skinTarget = newAcc.skinData || newAcc.name;
+                                const skinLoadUrl = (skinTarget.startsWith('http') || skinTarget.startsWith('data:image')) 
+                                    ? skinTarget 
+                                    : `https://mc-heads.net/skin/${encodeURIComponent(skinTarget)}`;
+                                mainSkinViewer.loadSkin(skinLoadUrl).catch(() => {});
+                            }
 
                             // ប្តូរមកផ្ទាំង Play Tab (ទំព័រដើម) ភ្លាមៗ
                             const playNavBtn = document.querySelectorAll('#main-nav button')[0];
@@ -3682,14 +3777,46 @@
                 });
             }
 
+            if (isElectron && window.electronAPI.onModDownloadProgress) {
+                window.electronAPI.onModDownloadProgress((data) => {
+                    const modName = data.modName;
+                    const percent = Math.min(100, Math.max(0, Math.round(data.percent || 0)));
+                    
+                    const progFill = document.getElementById(`btn-prog-fill-${modName}`);
+                    const progPct = document.getElementById(`btn-prog-pct-${modName}`);
+                    if (progFill) progFill.style.width = percent + '%';
+                    if (progPct) progPct.textContent = percent + '%';
+
+                    const installedObj = installedMods.find(m => m.id === modName);
+                    const title = installedObj ? installedObj.title : modName;
+                    const icon = installedObj ? installedObj.icon : null;
+                    const t = translations[currentLang] || translations.en;
+                    if (window.showToast) {
+                        showToast(title, `${t.modInstalling || 'Downloading'} ${percent}%`, "download", modName, percent, icon);
+                    }
+                });
+            }
+
             if (isElectron && window.electronAPI.onModInstalled) {
                 window.electronAPI.onModInstalled((modName) => {
-                    clearInterval(window.modDownloadIntervals[modName]);
-                    const t = translations[currentLang];
+                    if (window.modDownloadIntervals && window.modDownloadIntervals[modName]) {
+                        clearInterval(window.modDownloadIntervals[modName]);
+                        delete window.modDownloadIntervals[modName];
+                    }
+
+                    const progFill = document.getElementById(`btn-prog-fill-${modName}`);
+                    const progPct = document.getElementById(`btn-prog-pct-${modName}`);
+                    if (progFill) progFill.style.width = '100%';
+                    if (progPct) progPct.textContent = '100%';
+
+                    const t = translations[currentLang] || translations.en;
                     const installedObj = installedMods.find(m => m.id === modName);
+                    const modTitle = installedObj ? installedObj.title : modName;
                     const modIcon = installedObj ? installedObj.icon : null;
 
-                    if(window.showToast) showToast(installedObj ? installedObj.title : modName, t.modSuccessDesc, "success", modName, 100, modIcon);
+                    if(window.showToast) {
+                        showToast(modTitle, t.modSuccessDesc || "Successfully installed!", "success", modName, 100, modIcon);
+                    }
                     
                     const btn = document.getElementById(`mod-btn-${modName}`);
                     if (btn) {
@@ -3697,8 +3824,29 @@
                         btn.className = "w-full py-2.5 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 group-hover:bg-red-500/20 group-hover:text-red-400 group-hover:border-red-500/30";
                         btn.onmouseover = () => btn.innerHTML = '<i class="ph-bold ph-trash"></i> Remove'; 
                         btn.onmouseout = () => btn.innerHTML = '<i class="ph-bold ph-check"></i> Installed';
-                        btn.parentElement.classList.add('shadow-[0_0_15px_rgba(16,185,129,0.15)]', 'border-emerald-500/30');
+                        if (btn.parentElement) {
+                            btn.parentElement.classList.add('shadow-[0_0_15px_rgba(16,185,129,0.15)]', 'border-emerald-500/30');
+                        }
                     }
+                    refreshProfileModCount(activeProfileId);
+                });
+            }
+
+            if (isElectron && window.electronAPI.onModInstallError) {
+                window.electronAPI.onModInstallError((data) => {
+                    const modName = data.modName;
+                    clearInterval(window.modDownloadIntervals[modName]);
+                    const t = translations[currentLang] || translations.en;
+                    const btn = document.getElementById(`mod-btn-${modName}`);
+                    if (btn) {
+                        btn.innerHTML = '<i class="ph-bold ph-warning"></i> Error';
+                        btn.className = "w-full py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5";
+                        setTimeout(() => {
+                            btn.innerHTML = `<i class="ph-bold ph-download-simple"></i> Install`;
+                            btn.className = "w-full bg-brand-500 hover:bg-brand-400 text-white py-2 rounded-xl font-bold transition-colors text-xs flex items-center justify-center gap-2";
+                        }, 3000);
+                    }
+                    showToast(modName, data.error || (t.modErrorDesc || "Failed to download"), "error", modName);
                 });
             }
 
@@ -4868,14 +5016,14 @@
                                         ${isActive ? '<i class="ph-fill ph-check-circle text-brand-300 text-xs"></i>' : ''} ${prof.name}
                                     </span>
                                     ${isDefault ? `
-                                        <span class="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-0.5 shadow-sm">
-                                            <i class="ph-fill ph-star text-[9px]"></i> DEFAULT PROFILE
+                                        <span class="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-0.5 shadow-sm shrink-0">
+                                            <i class="ph-fill ph-star text-[8px]"></i> DEFAULT
                                         </span>
                                     ` : ''}
                                 </div>
                                 <div class="flex items-center gap-1.5 mt-0.5">
                                     <span class="text-[8px] font-black uppercase px-1.5 py-0.2 rounded border ${loaderBadgeClass}">${loader}</span>
-                                    <span class="text-[9px] text-gray-400 font-bold">${prof.version || '1.21.11'}</span>
+                                    <span class="text-[9px] text-gray-400 font-bold">${prof.version || '1.21.1'}</span>
                                 </div>
                             </div>
                         </div>
@@ -5750,7 +5898,7 @@
             showToast(currentLang === 'km' ? "បានចម្លង" : "Copied", currentLang === 'km' ? "បានចម្លង Crash Log ទៅកាន់ Clipboard" : "Crash log copied to clipboard", "success");
         };
 
-        window.startPortalLaunch = function() {
+        window.startPortalLaunch = async function() {
             try {
                 if (!currentUser) { 
                     openAuthModal(); 
@@ -5798,6 +5946,9 @@
                         window.electronAPI.updateDiscordRPC(`Launching Minecraft ${v}`, `Player: ${currentUser ? currentUser.name : 'Player'}`);
                     }
 
+                    // ទាញយក Formatted Cape Texture ជាក់ស្តែងដើម្បីបញ្ជូនទៅ In-Game Cape Engine
+                    const formattedCapeData = activeCape ? await resolveCapeTexture(activeCape) : null;
+
                     window.electronAPI.launchGame({ 
                         version: v, 
                         ram: r, 
@@ -5810,7 +5961,8 @@
                         profileId: activeProfileId,
                         loader: activeLoader,
                         launcherAction: savedLauncherAction,
-                        activeCape: activeCape
+                        activeCape: activeCape,
+                        activeCapeData: formattedCapeData
                     });
                 } else {
                     let prog = 0;
@@ -6084,17 +6236,33 @@
                     </div>
                 `;
                 
+                // Fallback simulation timer for non-electron or pre-download buffering
                 let prog = 0;
+                if (window.modDownloadIntervals[id]) clearInterval(window.modDownloadIntervals[id]);
                 window.modDownloadIntervals[id] = setInterval(() => {
-                    prog += Math.floor(Math.random() * 15) + 5;
-                    if(prog > 99) prog = 99;
-                    
-                    const progFill = document.getElementById(`btn-prog-fill-${id}`);
-                    const progPct = document.getElementById(`btn-prog-pct-${id}`);
-                    if (progFill) progFill.style.width = prog + '%';
-                    if (progPct) progPct.textContent = prog + '%';
-
-                    showToast(title, `${t.modInstalling || 'Downloading'} ${prog}%`, "download", id, prog, icon);
+                    if (!isElectron) {
+                        prog += Math.floor(Math.random() * 20) + 10;
+                        if (prog >= 100) {
+                            prog = 100;
+                            clearInterval(window.modDownloadIntervals[id]);
+                        }
+                        const progFill = document.getElementById(`btn-prog-fill-${id}`);
+                        const progPct = document.getElementById(`btn-prog-pct-${id}`);
+                        if (progFill) progFill.style.width = prog + '%';
+                        if (progPct) progPct.textContent = prog + '%';
+                        showToast(title, `${t.modInstalling || 'Downloading'} ${prog}%`, "download", id, prog, icon);
+                    } else {
+                        // In Electron, progress is driven accurately by 'onModDownloadProgress'
+                        prog = Math.min(85, prog + 5);
+                        const progFill = document.getElementById(`btn-prog-fill-${id}`);
+                        const progPct = document.getElementById(`btn-prog-pct-${id}`);
+                        if (progFill && parseInt(progFill.style.width || '0', 10) < prog) {
+                            progFill.style.width = prog + '%';
+                        }
+                        if (progPct && parseInt(progPct.textContent || '0', 10) < prog) {
+                            progPct.textContent = prog + '%';
+                        }
+                    }
                 }, 300);
 
                 try {
@@ -6306,50 +6474,16 @@
             }
         };
 
-        window.copyScreenshotAction = async function(encodedPath) {
-            const rawPath = decodeURIComponent(encodedPath);
-            if (isElectron && window.electronAPI && window.electronAPI.copyScreenshotImage) {
-                const res = await window.electronAPI.copyScreenshotImage(rawPath);
-                if (res && res.success) {
-                    showToast(currentLang === 'km' ? "បានចម្លងរួចរាល់" : "Copied to Clipboard", currentLang === 'km' ? "រូបភាពត្រូវបាន Copy! បើក Discord រួចចុច Ctrl+V ដើម្បីផ្ញើ។" : "Copied image! Paste with Ctrl+V into Discord.", "success");
-                } else {
-                    showToast(currentLang === 'km' ? "បរាជ័យ" : "Error", res?.error || "Could not copy image", "error");
-                }
-            } else {
-                showToast("Simulated Copy", "Screenshot image copied to clipboard!", "success");
-            }
-        };
-
-        window.deleteScreenshotAction = async function(encodedPath, btnElement) {
-            const rawPath = decodeURIComponent(encodedPath);
-            if (isElectron && window.electronAPI && window.electronAPI.deleteScreenshot) {
-                const res = await window.electronAPI.deleteScreenshot(rawPath);
-                if (res && res.success) {
-                    showToast(currentLang === 'km' ? "បានលុបរូបភាព" : "Deleted", currentLang === 'km' ? "បានលុបរូបថតចេញពី Folder" : "Screenshot removed.", "info");
-                    loadScreenshots();
-                } else {
-                    showToast(currentLang === 'km' ? "បរាជ័យ" : "Error", res?.error || "Could not delete", "error");
-                }
-            }
-        };
-
-        window.openScreenshotFolderAction = function() {
-            if (isElectron && window.electronAPI && window.electronAPI.openScreenshotFolder) {
-                window.electronAPI.openScreenshotFolder(activeProfileId);
-            } else {
-                showToast("Notice", "Requires desktop application.", "info");
-            }
-        };
-
-        window.openScreenshotLightbox = function(url, filename, encodedPath) {
+        window.openScreenshotLightbox = function(url, name, encodedPath) {
             const modal = document.getElementById('screenshot-lightbox-modal');
             const img = document.getElementById('lightbox-img');
             const nameEl = document.getElementById('lightbox-filename');
-            currentLightboxPath = encodedPath;
+            if (!modal || !img) return;
 
-            if (img) img.src = url;
-            if (nameEl) nameEl.textContent = filename;
-            if (modal) modal.classList.add('active');
+            currentLightboxPath = decodeURIComponent(encodedPath || '');
+            img.src = url;
+            if (nameEl) nameEl.textContent = name;
+            modal.classList.add('active');
         };
 
         window.closeScreenshotLightbox = function() {
@@ -6357,9 +6491,62 @@
             if (modal) modal.classList.remove('active');
         };
 
-        window.copyCurrentLightboxScreenshot = function() {
-            if (currentLightboxPath) {
-                copyScreenshotAction(currentLightboxPath);
+        window.copyCurrentLightboxScreenshot = async function() {
+            if (!currentLightboxPath) return;
+            const btn = document.getElementById('lightbox-copy-btn');
+            if (btn) btn.classList.add('opacity-70', 'pointer-events-none');
+
+            if (isElectron && window.electronAPI && window.electronAPI.copyScreenshotImage) {
+                const res = await window.electronAPI.copyScreenshotImage(currentLightboxPath);
+                if (btn) btn.classList.remove('opacity-70', 'pointer-events-none');
+                if (res && res.success) {
+                    showToast(currentLang === 'km' ? "បានចម្លង" : "Copied", currentLang === 'km' ? "បាន Copy រូបភាពសម្រាប់ Discord!" : "Copied screenshot for Discord!", "success");
+                } else {
+                    showToast(currentLang === 'km' ? "បរាជ័យ" : "Failed", res?.error || "Could not copy image.", "error");
+                }
+            } else {
+                if (btn) btn.classList.remove('opacity-70', 'pointer-events-none');
+                showToast("Browser Mode", "Screenshot copied (Simulation)", "success");
+            }
+        };
+
+        window.copyScreenshotAction = async function(encodedPath) {
+            const fullPath = decodeURIComponent(encodedPath || '');
+            if (isElectron && window.electronAPI && window.electronAPI.copyScreenshotImage) {
+                const res = await window.electronAPI.copyScreenshotImage(fullPath);
+                if (res && res.success) {
+                    showToast(currentLang === 'km' ? "បានចម្លង" : "Copied", currentLang === 'km' ? "បាន Copy រូបភាពសម្រាប់ Discord!" : "Copied screenshot for Discord!", "success");
+                } else {
+                    showToast(currentLang === 'km' ? "បរាជ័យ" : "Failed", res?.error || "Could not copy image.", "error");
+                }
+            } else {
+                showToast("Browser Mode", "Screenshot copied (Simulation)", "success");
+            }
+        };
+
+        window.deleteScreenshotAction = async function(encodedPath, btn) {
+            const fullPath = decodeURIComponent(encodedPath || '');
+            if (isElectron && window.electronAPI && window.electronAPI.deleteScreenshot) {
+                const res = await window.electronAPI.deleteScreenshot(fullPath);
+                if (res && res.success) {
+                    const card = btn.closest('.glass-card');
+                    if (card) card.remove();
+                    showToast(currentLang === 'km' ? "បានលុប" : "Deleted", currentLang === 'km' ? "បានលុបរូបថតចេញរួចរាល់" : "Screenshot removed successfully.", "success");
+                } else {
+                    showToast(currentLang === 'km' ? "បរាជ័យ" : "Failed", res?.error || "Could not delete screenshot.", "error");
+                }
+            } else {
+                const card = btn.closest('.glass-card');
+                if (card) card.remove();
+                showToast("Deleted", "Screenshot removed.", "success");
+            }
+        };
+
+        window.openScreenshotFolderAction = function() {
+            if (isElectron && window.electronAPI && window.electronAPI.openScreenshotFolder) {
+                window.electronAPI.openScreenshotFolder(activeProfileId);
+            } else {
+                showToast("Notice", "Requires desktop application to open screenshots folder.", "info");
             }
         };
     </script>

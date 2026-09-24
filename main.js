@@ -90,8 +90,10 @@ class MinecraftCoreEngine {
             await new Promise((resolve, reject) => {
                 response.data.pipe(writer);
                 let err = null;
-                writer.on('error', e => { err = e; writer.close(); reject(e); });
-                writer.on('close', () => { if (!err) resolve(true); });
+                writer.on('error', e => { err = e; try { writer.close(); } catch(ex){} reject(e); });
+                writer.on('finish', () => {
+                    writer.close(() => { if (!err) resolve(true); });
+                });
             });
 
             if (!this.verifyFile(tempPath, expectedSha1, expectedSize)) {
@@ -162,7 +164,7 @@ class MinecraftCoreEngine {
 const mcEngine = new MinecraftCoreEngine();
 
 // =========================================================================
-// AUTO RAM CLEANUP ENGINE (SAFE IN-PROCESS MEMORY OPTIMIZATION)
+// AUTO RAM CLEANUP ENGINE
 // =========================================================================
 function performRamCleanup() {
     try {
@@ -176,7 +178,7 @@ function performRamCleanup() {
 }
 
 // =========================================================================
-// ESSENTIAL HELPER FUNCTIONS (DIRECTORY, NETWORK & FABRIC PROFILE ENGINE)
+// ESSENTIAL HELPER FUNCTIONS
 // =========================================================================
 
 function sendLogToUI(message, type = 'info') {
@@ -233,7 +235,7 @@ function ensureLongvekInGameConfig(instanceDir, username = 'Player') {
         const hudConfigs = ['longvek-hud.json', 'kronhud.json', 'simplehud.json'];
         const hudPayload = {
             clientName: "LONGVEK CLIENT",
-            clientVersion: "v2.5 PRO",
+            clientVersion: "v2.0 PRO",
             theme: {
                 primaryColor: "#38bdf8",
                 secondaryColor: "#0ea5e9",
@@ -246,7 +248,7 @@ function ensureLongvekInGameConfig(instanceDir, username = 'Player') {
                 borderColor: "rgba(56, 189, 248, 0.45)"
             },
             modules: {
-                watermark: { enabled: true, text: "LONGVEK CLIENT v2.5", x: 6, y: 6, color: "#38bdf8" },
+                watermark: { enabled: true, text: "LONGVEK CLIENT v2.0", x: 6, y: 6, color: "#38bdf8" },
                 fps: { enabled: true, showLabel: true, x: 6, y: 22, color: "#ffffff" },
                 ping: { enabled: true, showLabel: true, x: 6, y: 36, color: "#34d399" },
                 cps: { enabled: true, showBoth: true, x: 6, y: 50, color: "#38bdf8" },
@@ -320,7 +322,11 @@ function ensureLongvekInGameConfig(instanceDir, username = 'Player') {
     }
 }
 
-async function downloadFile(url, destPath, label = 'File') {
+// មុខងារទាញយកហ្វាលដែលរាយការណ៍ Progress និង Flush Stream ពេញលេញ ១០០%
+async function downloadFile(url, destPath, label = 'File', onProgress = null) {
+    const dir = path.dirname(destPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
     const tempPath = destPath + '.tmp';
     const writer = fs.createWriteStream(tempPath);
     try {
@@ -328,19 +334,37 @@ async function downloadFile(url, destPath, label = 'File') {
             url,
             method: 'GET',
             responseType: 'stream',
-            timeout: 30000,
+            timeout: 45000,
             headers: { 'User-Agent': 'LONGVEK-Client-Downloader/2.5' }
+        });
+
+        const totalLength = parseInt(response.headers['content-length'] || '0', 10);
+        let downloaded = 0;
+
+        response.data.on('data', chunk => {
+            downloaded += chunk.length;
+            if (totalLength > 0 && typeof onProgress === 'function') {
+                const pct = Math.min(99, Math.round((downloaded / totalLength) * 100));
+                onProgress(pct);
+            }
         });
 
         await new Promise((resolve, reject) => {
             response.data.pipe(writer);
-            let error = null;
-            writer.on('error', err => { error = err; writer.close(); reject(err); });
-            writer.on('close', () => { if (!error) resolve(true); });
+
+            writer.on('error', err => {
+                try { writer.close(); } catch(e){}
+                reject(err);
+            });
+            writer.on('finish', () => {
+                writer.close(() => resolve(true));
+            });
         });
 
+        if (typeof onProgress === 'function') onProgress(100);
+
         const stat = fs.statSync(tempPath);
-        if (stat.size > 1024) {
+        if (stat.size > 30) {
             if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
             fs.renameSync(tempPath, destPath);
             return true;
@@ -349,7 +373,9 @@ async function downloadFile(url, destPath, label = 'File') {
             throw new Error('Downloaded file is empty or corrupted.');
         }
     } catch (error) {
-        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        if (fs.existsSync(tempPath)) {
+            try { fs.unlinkSync(tempPath); } catch (e) {}
+        }
         throw error;
     }
 }
@@ -459,6 +485,120 @@ async function ensureInGameHudMod(instanceDir, mcVersion, loader = 'fabric') {
 }
 
 // =========================================================================
+// IN-GAME CAPE ENGINE
+// =========================================================================
+async function ensureInGameCape(instanceDir, username, capeUrl, mcVersion, loader = 'fabric', capeData = null, userUuid = null) {
+    if (!capeUrl && !capeData) return false;
+
+    try {
+        const instModsDir = path.join(instanceDir, 'mods');
+        if (!fs.existsSync(instModsDir)) fs.mkdirSync(instModsDir, { recursive: true });
+
+        const files = fs.readdirSync(instModsDir);
+        const hasCapeMod = files.some(f => f.toLowerCase().includes('customskinloader') && !f.endsWith('.disabled'));
+
+        if (!hasCapeMod) {
+            sendLogToUI(`[Cape Engine]: Downloading In-Game Cape Loader (CustomSkinLoader)...`, 'info');
+            try {
+                const cleanVer = mcVersion.replace(/^(Fabric|Forge|OptiFine|Release)\s*/i, '').trim();
+                const apiUrl = `https://api.modrinth.com/v2/project/customskinloader/version`;
+                const res = await axios.get(apiUrl, { timeout: 10000, headers: { 'User-Agent': 'LONGVEK-Cape-Engine/3.0' } });
+                
+                if (Array.isArray(res.data) && res.data.length > 0) {
+                    const targetEntry = res.data.find(v => {
+                        return (!v.game_versions || v.game_versions.includes(cleanVer)) &&
+                               (!v.loaders || v.loaders.includes(loader));
+                    }) || res.data.find(v => !v.loaders || v.loaders.includes(loader)) || res.data[0];
+
+                    const file = targetEntry.files.find(f => f.primary) || targetEntry.files[0];
+                    const destPath = path.join(instModsDir, file.filename);
+                    await downloadFile(file.url, destPath, 'CustomSkinLoader');
+                    sendLogToUI(`[Cape Engine]: Cape Loader installed successfully!`, 'success');
+                }
+            } catch (err) {
+                console.warn('[Cape Engine]: CustomSkinLoader fetch fallback:', err.message);
+            }
+        }
+
+        const cslDir = path.join(instanceDir, 'CustomSkinLoader');
+        const localCapesDir = path.join(cslDir, 'LocalSkin', 'capes');
+        const rootCapesDir = path.join(cslDir, 'capes');
+        const instCapesDir = path.join(instanceDir, 'capes');
+
+        [localCapesDir, rootCapesDir, instCapesDir].forEach(d => {
+            if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+        });
+
+        const safeUsername = (username || 'Player').replace(/\s+/g, '_');
+        const filenames = [
+            `${safeUsername}.png`,
+            `${safeUsername.toLowerCase()}.png`
+        ];
+
+        if (userUuid) {
+            const cleanUuid = userUuid.replace(/-/g, '').trim();
+            filenames.push(`${userUuid}.png`);
+            filenames.push(`${cleanUuid}.png`);
+            filenames.push(`${cleanUuid.toLowerCase()}.png`);
+        }
+
+        let capeBuffer = null;
+        if (capeData && typeof capeData === 'string' && capeData.startsWith('data:image')) {
+            const base64Data = capeData.replace(/^data:image\/\w+;base64,/, '');
+            capeBuffer = Buffer.from(base64Data, 'base64');
+        } else if (capeUrl) {
+            let normalizedCapeUrl = capeUrl;
+            if (normalizedCapeUrl.includes('github.com') && normalizedCapeUrl.includes('/blob/')) {
+                normalizedCapeUrl = normalizedCapeUrl.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+            }
+            try {
+                const res = await axios.get(normalizedCapeUrl, { responseType: 'arraybuffer', timeout: 15000 });
+                if (res.data && res.data.length > 30) {
+                    capeBuffer = Buffer.from(res.data);
+                }
+            } catch (e) {
+                console.warn('[Cape Engine]: Raw cape buffer fetch error:', e.message);
+            }
+        }
+
+        if (capeBuffer && capeBuffer.length > 30) {
+            sendLogToUI(`[Cape Engine]: Synchronizing LONGVEK Cape texture for ${safeUsername}...`, 'info');
+            [localCapesDir, rootCapesDir, instCapesDir].forEach(targetDir => {
+                filenames.forEach(fn => {
+                    try {
+                        fs.writeFileSync(path.join(targetDir, fn), capeBuffer);
+                    } catch (e) {}
+                });
+            });
+        }
+
+        const cslConfigPath = path.join(cslDir, 'CustomSkinLoader.json');
+        const cslConfigPayload = {
+            version: "14.15",
+            loadlist: [
+                { name: "LocalSkin", type: "Legacy" },
+                { name: "Mojang", type: "MojangAPI" },
+                { name: "MinecraftCapes", type: "MinecraftCapes" },
+                { name: "OptiFineCape", type: "OptiFineCape" }
+            ],
+            enableDynamicSkull: true,
+            enableTransparentSkin: true,
+            ignoreServerSkin: false
+        };
+
+        try {
+            fs.writeFileSync(cslConfigPath, JSON.stringify(cslConfigPayload, null, 2), 'utf8');
+        } catch (e) {}
+
+        sendLogToUI(`[Cape Engine]: In-Game Cape synchronized 100% with Launcher!`, 'success');
+        return true;
+    } catch (e) {
+        console.warn('[Cape Engine Warning]: Failed to inject in-game cape:', e.message);
+        return false;
+    }
+}
+
+// =========================================================================
 // SMART CRASH ANALYZER ENGINE
 // =========================================================================
 function analyzeCrashLog(instanceDir, exitCode) {
@@ -494,7 +634,6 @@ function analyzeCrashLog(instanceDir, exitCode) {
 
         result.details = latestLogText.slice(-3000) || `Process exited with code ${exitCode}. No detailed log available.`;
 
-        // Diagnostic 1: Missing Fabric API
         if (latestLogText.includes('fabric') && (latestLogText.includes('requires fabric') || latestLogText.includes('Missing or unsupported mandatory dependencies:') || latestLogText.includes('fabric-api'))) {
             result.summaryEn = 'Missing Mandatory Dependency: Fabric API';
             result.summaryKh = 'ខ្វះបណ្ណាល័យសំខាន់៖ Fabric API';
@@ -506,7 +645,6 @@ function analyzeCrashLog(instanceDir, exitCode) {
             return result;
         }
 
-        // Diagnostic 2: Out of Memory Error
         if (latestLogText.includes('java.lang.OutOfMemoryError') || latestLogText.includes('Could not reserve enough space') || latestLogText.includes('error: memory')) {
             result.summaryEn = 'Insufficient RAM Allocated (OutOfMemoryError)';
             result.summaryKh = 'ខ្វះទំហំ Memory RAM (OutOfMemoryError)';
@@ -518,7 +656,6 @@ function analyzeCrashLog(instanceDir, exitCode) {
             return result;
         }
 
-        // Diagnostic 3: Mod Conflict (OptiFine + Sodium / Embeddium)
         if ((latestLogText.includes('optifine') || latestLogText.includes('OptiFine')) && (latestLogText.includes('sodium') || latestLogText.includes('embeddium'))) {
             result.summaryEn = 'Incompatible Mods Conflict (OptiFine + Sodium)';
             result.summaryKh = 'ម៉ូដជល់គ្នា (OptiFine ជាមួយ Sodium)';
@@ -583,7 +720,6 @@ async function installLowEndFpsPack(profileId, mcVersion, loader = 'fabric') {
 // MODPACK IMPORT & SCREENSHOTS GALLERY IPC HANDLERS
 // =========================================================================
 
-// 1. MODPACK DRAG & DROP ACTIVE HANDLER
 ipcMain.handle('import-modpack-file', async (_event, filePath) => {
     if (!filePath || typeof filePath !== 'string') {
         return { success: false, error: 'Invalid file path.' };
@@ -600,13 +736,11 @@ ipcMain.handle('import-modpack-file', async (_event, filePath) => {
 
         sendLogToUI(`Extracting modpack: ${path.basename(filePath)}...`, 'info');
         
-        // សុវត្ថិភាព: Extract zip ទៅកាន់ទីតាំងសុវត្ថិភាព 
         await extract(filePath, { dir: targetInstance });
 
         let detectedVersion = '1.20.1';
         let detectedLoader = 'fabric';
 
-        // Check for Modrinth .mrpack index
         const modrinthIndex = path.join(targetInstance, 'modrinth.index.json');
         if (fs.existsSync(modrinthIndex)) {
             try {
@@ -616,7 +750,6 @@ ipcMain.handle('import-modpack-file', async (_event, filePath) => {
                     if (idx.dependencies?.forge) detectedLoader = 'forge';
                     else if (idx.dependencies?.fabric) detectedLoader = 'fabric';
                 }
-                // Move overrides into root
                 const overridesDir = path.join(targetInstance, 'overrides');
                 if (fs.existsSync(overridesDir)) {
                     const entries = fs.readdirSync(overridesDir);
@@ -645,7 +778,6 @@ ipcMain.handle('import-modpack-file', async (_event, filePath) => {
     }
 });
 
-// 2. SCREENSHOTS GALLERY HANDLERS
 ipcMain.handle('get-screenshots', async (_event, profileId) => {
     try {
         const instDir = getInstanceDir(profileId);
@@ -680,7 +812,6 @@ ipcMain.handle('delete-screenshot', async (_event, filePath) => {
         if (!filePath || typeof filePath !== 'string') {
             return { success: false, error: 'Invalid path' };
         }
-        // សុវត្ថិភាពខ្ពស់៖ ការពារ Path Traversal ដោយអនុញ្ញាតឱ្យលុបតែហ្វាលណាដែលនៅក្នុង .longvek ប៉ុណ្ណោះ
         const normalizedPath = path.resolve(filePath);
         if (!normalizedPath.startsWith(path.resolve(rootPath))) {
             return { success: false, error: 'Access denied: Path outside safe root.' };
@@ -701,7 +832,6 @@ ipcMain.handle('copy-screenshot-image', async (_event, filePath) => {
         if (!filePath || typeof filePath !== 'string') {
             return { success: false, error: 'Invalid path' };
         }
-        // សុវត្ថិភាពខ្ពស់៖ អនុញ្ញាតឱ្យអានតែហ្វាលក្នុង .longvek
         const normalizedPath = path.resolve(filePath);
         if (!normalizedPath.startsWith(path.resolve(rootPath))) {
             return { success: false, error: 'Access denied: Path outside safe root.' };
@@ -722,7 +852,6 @@ ipcMain.on('open-external-link', (_event, url) => {
     if (!url || typeof url !== 'string') return;
     try {
         const parsed = new URL(url);
-        // អនុញ្ញាតឱ្យបើកតែ http: និង https: ប៉ុណ្ណោះ ការពារកុំឱ្យបើក file:// ឬ command scripts
         if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
             shell.openExternal(url);
         } else {
@@ -741,6 +870,73 @@ ipcMain.on('open-screenshot-folder', (_event, profileId) => {
 });
 
 // =========================================================================
+// MOD & CONTENT MANAGER IPC HANDLERS (ដោះស្រាយបញ្ហាគាំងនៅ 99%)
+// =========================================================================
+ipcMain.on('install-mod', async (event, data) => {
+    const { downloadUrl, fileName, modName, type, profileId } = data;
+    try {
+        const targetFolder = getInstanceContentDir(profileId, type);
+        const destPath = path.join(targetFolder, fileName);
+
+        sendLogToUI(`Downloading ${modName} (${fileName})...`, 'info');
+        
+        await downloadFile(downloadUrl, destPath, modName, (percent) => {
+            // បញ្ជូនភាគរយពិតប្រាកដទៅកាន់ UI ភ្លាមៗ
+            event.sender.send('mod-download-progress', { modName, percent });
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('mod-download-progress', { modName, percent });
+            }
+        });
+
+        sendLogToUI(`Successfully installed ${modName}!`, 'success');
+        
+        // ធានាថាបញ្ជូនដំណឹងជោគជ័យ ១០០% ទៅ UI ទាំងពីរផ្លូវ
+        event.sender.send('mod-download-progress', { modName, percent: 100 });
+        event.sender.send('mod-installed', modName);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('mod-installed', modName);
+        }
+    } catch (err) {
+        console.error(`[Mod Download Error]: ${err.message}`);
+        sendLogToUI(`Failed to download ${modName}: ${err.message}`, 'error');
+        event.sender.send('mod-install-error', { modName, error: err.message });
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('mod-install-error', { modName, error: err.message });
+        }
+    }
+});
+
+ipcMain.on('delete-mod', async (_event, data) => {
+    const { filename, type, profileId } = data;
+    try {
+        const targetFolder = getInstanceContentDir(profileId, type);
+        const targetPath = path.join(targetFolder, filename);
+        const disabledPath = targetPath + '.disabled';
+        if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+        if (fs.existsSync(disabledPath)) fs.unlinkSync(disabledPath);
+    } catch (err) {
+        console.warn(`[Delete Mod Error]: ${err.message}`);
+    }
+});
+
+ipcMain.on('toggle-mod', async (_event, data) => {
+    const { filename, type, enable, profileId } = data;
+    try {
+        const targetFolder = getInstanceContentDir(profileId, type);
+        const normalName = filename.replace(/\.disabled$/, '');
+        const activePath = path.join(targetFolder, normalName);
+        const disabledPath = path.join(targetFolder, normalName + '.disabled');
+        if (enable) {
+            if (fs.existsSync(disabledPath)) fs.renameSync(disabledPath, activePath);
+        } else {
+            if (fs.existsSync(activePath)) fs.renameSync(activePath, disabledPath);
+        }
+    } catch (err) {
+        console.warn(`[Toggle Mod Error]: ${err.message}`);
+    }
+});
+
+// =========================================================================
 // DISCORD RPC ENGINE
 // =========================================================================
 const CLIENT_ID = '123456789012345678';
@@ -750,7 +946,6 @@ let rpcRetryTimer = null;
 function initDiscordRPC() {
     if (!rpcEnabled) return;
     try {
-        // Lazy loading discord-rpc ដើម្បីកុំឱ្យយឺតពេលបើកកម្មវិធី
         const DiscordRPC = require('discord-rpc');
         rpcClient = new DiscordRPC.Client({ transport: 'ipc' });
         rpcClient.on('ready', () => {
@@ -941,7 +1136,6 @@ function createWindow() {
 
     mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-    // សុវត្ថិភាព: ទប់ស្កាត់រាល់ការ Navigate ទៅកាន់ URL ខាងក្រៅក្នុង Main Window 
     mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
         const parsedUrl = new URL(navigationUrl);
         if (parsedUrl.protocol !== 'file:') {
@@ -950,7 +1144,6 @@ function createWindow() {
         }
     });
 
-    // សុវត្ថិភាព: ទប់ស្កាត់រាល់ការបើក window ថ្មីពីក្នុង Renderer
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         console.warn(`[Security Warning]: Blocked window open attempt for ${url}`);
         return { action: 'deny' };
@@ -985,7 +1178,6 @@ function finishSplashAndOpenMain() {
     });
 }
 
-// Java auto-detect with Java 21 verification
 function getJavaMajorVersion(binPath) {
     if (!binPath || !fs.existsSync(binPath)) return 0;
     try {
@@ -1005,7 +1197,6 @@ function findSystemJava(requiredTarget = 'java21') {
     const binaryName = isWindows ? 'javaw.exe' : 'java';
     const fallbackBin = isWindows ? 'java.exe' : 'java';
 
-    // 1. Check local runtimes in .longvek
     const localDir = path.join(runtimesDir, requiredTarget);
     const candidates = [
         path.join(localDir, 'bin', binaryName),
@@ -1022,7 +1213,6 @@ function findSystemJava(requiredTarget = 'java21') {
         } catch (e) {}
     }
 
-    // 2. Check official Mojang Launcher runtimes
     if (isWindows) {
         const appData = app.getPath('appData');
         const mojangRuntimes = [
@@ -1033,13 +1223,11 @@ function findSystemJava(requiredTarget = 'java21') {
         candidates.push(...mojangRuntimes);
     }
 
-    // 3. Check JAVA_HOME environment
     if (process.env.JAVA_HOME) {
         candidates.push(path.join(process.env.JAVA_HOME, 'bin', binaryName));
         candidates.push(path.join(process.env.JAVA_HOME, 'bin', fallbackBin));
     }
 
-    // 4. Check common Program Files JDK directories
     if (isWindows) {
         const searchBases = [
             'C:\\Program Files\\Eclipse Adoptium',
@@ -1069,7 +1257,6 @@ function findSystemJava(requiredTarget = 'java21') {
         }
     }
 
-    // Fallback search without strict release check
     for (const bin of candidates) {
         if (fs.existsSync(bin)) {
             if (requiredTarget === 'java21' && (bin.includes('21') || bin.includes('gamma'))) return bin;
@@ -1101,7 +1288,7 @@ async function downloadPortableJava21() {
         await new Promise((resolve, reject) => {
             response.data.pipe(writer);
             writer.on('error', reject);
-            writer.on('close', resolve);
+            writer.on('finish', resolve);
         });
 
         sendLogToUI('Extracting Java 21 OpenJDK Runtime...', 'info');
@@ -1133,7 +1320,6 @@ async function ensureJava(gameVersion) {
     let detectedJava = findSystemJava(javaTarget);
     if (detectedJava) return detectedJava;
 
-    // ប្រសិនបើជា Minecraft 1.20.5+ / 1.21+ ហើយខ្វះ Java 21 ទាញយក Portable Java 21 ដោយស្វ័យប្រវត្តិ
     if (javaTarget === 'java21') {
         sendLogToUI('Java 21 required for Minecraft 1.21+. Auto-installing...', 'info');
         const autoInstalledJava = await downloadPortableJava21();
@@ -1143,13 +1329,34 @@ async function ensureJava(gameVersion) {
     return process.platform === 'win32' ? 'javaw' : 'java';
 }
 
-// =========================================================================
-// IPC HANDLERS FOR LOW-END BOOST PACK, RAM CLEANUP & SMART DOCTOR
-// =========================================================================
-
 ipcMain.handle('clean-memory', async () => {
     performRamCleanup();
     return { success: true };
+});
+
+ipcMain.handle('fetch-image-base64', async (_event, imageUrl) => {
+    if (!imageUrl || typeof imageUrl !== 'string') return null;
+    try {
+        let targetUrl = imageUrl;
+        if (targetUrl.includes('github.com') && targetUrl.includes('/blob/')) {
+            targetUrl = targetUrl.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+        }
+
+        const res = await axios.get(targetUrl, {
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'LONGVEK-Launcher-AssetEngine/3.0'
+            }
+        });
+
+        const mime = res.headers['content-type'] || 'image/png';
+        const base64 = Buffer.from(res.data, 'binary').toString('base64');
+        return `data:${mime};base64,${base64}`;
+    } catch (err) {
+        console.warn(`[Asset Engine]: Failed to fetch image ${imageUrl}:`, err.message);
+        return null;
+    }
 });
 
 ipcMain.handle('install-fps-pack', async (_event, { profileId, version, loader }) => {
@@ -1214,14 +1421,117 @@ ipcMain.on('cancel-launch', () => {
     setActivity('Main Menu', 'Ready to Play');
 });
 
-// Test HUD Overlay simulation event
 ipcMain.on('test-overlay', (_event, data) => {
     console.log('[HUD Overlay Test]: Triggered preview for', data);
     sendLogToUI(`[HUD Engine]: LONGVEK In-Game HUD activated for ${data.username || 'Player'}! Press RSHIFT to toggle menu.`, 'success');
 });
 
 // =========================================================================
-// GAME LAUNCH DISPATCHER WITH AUTO RAM CLEANUP
+// MICROSOFT OAUTH AUTHENTICATION (MSMC)
+// =========================================================================
+ipcMain.on('ms-login', async (_event, lang = 'en') => {
+    sendLogToUI('Starting Microsoft authentication...', 'info');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('ms-login-status', {
+            status: 'loading',
+            msg: lang === 'km' ? 'កំពុងបើកផ្ទាំង Login របស់ Microsoft...' : 'Opening Microsoft login window...'
+        });
+    }
+
+    try {
+        let mclcAuth = null;
+        let playerName = 'Player';
+        let playerUuid = '';
+        let skinUrl = '';
+
+        if (msmc && typeof msmc.Auth === 'function') {
+            const authManager = new msmc.Auth('select_account');
+            const xboxManager = await authManager.launch('electron');
+            if (!xboxManager) throw new Error('Microsoft authentication was cancelled.');
+
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('ms-login-status', {
+                    status: 'loading',
+                    msg: lang === 'km' ? 'កំពុងទាញយក Minecraft Profile...' : 'Fetching Minecraft profile...'
+                });
+            }
+
+            const mcToken = await xboxManager.getMinecraft();
+            if (!mcToken) throw new Error('Failed to retrieve Minecraft profile.');
+            
+            mclcAuth = typeof mcToken.mclc === 'function' ? mcToken.mclc() : (mcToken.mclcAuth || mcToken);
+            playerName = mcToken.profile?.name || mclcAuth?.name || 'Player';
+            playerUuid = mcToken.profile?.id || mclcAuth?.uuid || '';
+
+            if (mcToken.profile?.skins && mcToken.profile.skins.length > 0) {
+                const activeSkin = mcToken.profile.skins.find(s => s.state === 'ACTIVE') || mcToken.profile.skins[0];
+                skinUrl = activeSkin.url || '';
+            }
+        } else if (msmc && typeof msmc.fastLaunch === 'function') {
+            const res = await msmc.fastLaunch('electron', (update) => {
+                if (mainWindow && !mainWindow.isDestroyed() && update && update.data) {
+                    mainWindow.webContents.send('ms-login-status', {
+                        status: 'loading',
+                        msg: update.data
+                    });
+                }
+            });
+            if (!res) throw new Error('Microsoft authentication was cancelled.');
+            mclcAuth = typeof res.mclc === 'function' ? res.mclc() : res;
+            playerName = res.profile?.name || mclcAuth?.name || 'Player';
+            playerUuid = res.profile?.id || mclcAuth?.uuid || '';
+        } else {
+            throw new Error('MSMC authentication library is not available.');
+        }
+
+        if (!mclcAuth || (!mclcAuth.access_token && !mclcAuth.token)) {
+            throw new Error('Did not receive valid access token from Microsoft.');
+        }
+
+        const validAccessToken = mclcAuth.access_token || mclcAuth.token;
+        const normalizedUuid = ensureValidUUID(playerUuid, playerName);
+
+        const account = {
+            id: 'ms_' + (playerUuid || Date.now()),
+            name: playerName,
+            type: 'microsoft',
+            role: 'Microsoft Account',
+            accountCategory: 'premium',
+            mclcAuth: {
+                access_token: validAccessToken,
+                client_token: mclcAuth.client_token || 'longvek-launcher',
+                uuid: normalizedUuid,
+                name: playerName,
+                user_properties: typeof mclcAuth.user_properties === 'string' ? mclcAuth.user_properties : "{}",
+                meta: { type: 'msa', demo: false }
+            },
+            skinData: skinUrl || playerName,
+            skinName: playerName,
+            originalSkin: skinUrl || playerName,
+            headAvatar: `https://mc-heads.net/avatar/${encodeURIComponent(playerName)}/64`
+        };
+
+        sendLogToUI(`Microsoft login successful for ${playerName}!`, 'success');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('ms-login-status', {
+                status: 'success',
+                account: account
+            });
+        }
+    } catch (err) {
+        console.error('[Microsoft Login Error]:', err);
+        sendLogToUI(`Microsoft login error: ${err.message}`, 'error');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('ms-login-status', {
+                status: 'error',
+                msg: err.message || 'Login failed or was cancelled.'
+            });
+        }
+    }
+});
+
+// =========================================================================
+// GAME LAUNCH DISPATCHER
 // =========================================================================
 ipcMain.on('launch-game', async (event, data) => {
     isLaunchAborted = false;
@@ -1266,7 +1576,7 @@ ipcMain.on('launch-game', async (event, data) => {
         "-XX:+PerfDisableSharedMem",
         "-XX:+UseStringDeduplication",
         "-Dminecraft.launcher.brand=LONGVEK-Launcher",
-        "-Dminecraft.launcher.version=2.5"
+        "-Dminecraft.launcher.version=2.0"
     ];
 
     const userArgs = Array.isArray(data.customArgs) ? data.customArgs : [];
@@ -1278,7 +1588,6 @@ ipcMain.on('launch-game', async (event, data) => {
     const instanceDir = getInstanceDir(profileId);
     let cleanVersion = version.replace(/^(Fabric|Forge|OptiFine|Release)\s*/i, '').trim();
 
-    // ជួសជុល Version ក្លែងក្លាយ 1.21.11 ទៅជា 1.21.1 ដោយស្វ័យប្រវត្តិ
     if (cleanVersion === '1.21.11') {
         cleanVersion = '1.21.1';
     }
@@ -1298,14 +1607,18 @@ ipcMain.on('launch-game', async (event, data) => {
         if (isOffline) {
             authObj = Authenticator.getAuth(username.replace(/\s+/g, '_'));
         } else {
-            authObj = {
-                access_token: authData.access_token,
-                client_token: authData.client_token || 'longvek-launcher',
-                uuid: ensureValidUUID(authData.uuid, username),
-                name: authData.name || username,
-                user_properties: "{}",
-                meta: { type: 'msa', demo: false }
-            };
+            if (authData && authData.access_token) {
+                authObj = {
+                    access_token: authData.access_token,
+                    client_token: authData.client_token || 'longvek-launcher',
+                    uuid: ensureValidUUID(authData.uuid, username),
+                    name: authData.name || username,
+                    user_properties: typeof authData.user_properties === 'string' ? authData.user_properties : "{}",
+                    meta: authData.meta || { type: 'msa', demo: false }
+                };
+            } else {
+                authObj = Authenticator.getAuth(username.replace(/\s+/g, '_'));
+            }
         }
 
         let opts = {
@@ -1325,6 +1638,9 @@ ipcMain.on('launch-game', async (event, data) => {
             if (customFabricId) opts.version.custom = customFabricId;
             await ensureFabricAPI(instanceDir, cleanVersion);
             await ensureInGameHudMod(instanceDir, cleanVersion, activeLoader);
+            if (data.activeCape || data.activeCapeData) {
+                await ensureInGameCape(instanceDir, username, data.activeCape, cleanVersion, activeLoader, data.activeCapeData, authObj?.uuid);
+            }
         }
 
         let hasGameStarted = false;

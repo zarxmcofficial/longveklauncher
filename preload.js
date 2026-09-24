@@ -100,9 +100,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // --- Content Manager (Mods, Resource Packs, Shaders) ---
     getInstalledContent: (profileId) => ipcRenderer.invoke('get-installed-content', profileId),
     installMod: (data) => ipcRenderer.send('install-mod', data),
+    onModDownloadProgress: (callback) => {
+        ipcRenderer.removeAllListeners('mod-download-progress');
+        ipcRenderer.on('mod-download-progress', (_event, data) => callback(data));
+    },
     onModInstalled: (callback) => {
         ipcRenderer.removeAllListeners('mod-installed');
         ipcRenderer.on('mod-installed', (_event, modName) => callback(modName));
+    },
+    onModInstallError: (callback) => {
+        ipcRenderer.removeAllListeners('mod-install-error');
+        ipcRenderer.on('mod-install-error', (_event, data) => callback(data));
     },
     deleteContentFile: (category, fileName, profileId) => ipcRenderer.invoke('delete-content-file', { category, fileName, profileId }),
     deleteMod: (modData) => ipcRenderer.send('delete-mod', modData),

@@ -1,14 +1,15 @@
 {
 "name": "zklizlauncher1.0",
 "productName": "LONGVEK LAUNCHER",
-"version": "1.0.9",
+"version": "1.1.0",
 "description": "កម្មវិធីបើកលេង Minecraft កម្ពុជា - LONGVEK LAUNCHER",
 "main": "main.js",
 "scripts": {
 "start": "electron .",
 "build": "electron-builder --win --x64",
 "build:win": "electron-builder --win --x64",
-"build:linux": "electron-builder --linux AppImage deb",
+"build:linux": "electron-builder --linux AppImage deb tar.gz",
+"build:linux:tar": "electron-builder --linux tar.gz",
 "build:all": "electron-builder --win --linux",
 "dist": "electron-builder"
 },
@@ -73,7 +74,8 @@
 "linux": {
 "target": [
 "AppImage",
-"deb"
+"deb",
+"tar.gz"
 ],
 "category": "Game",
 "icon": "LONGVEKLAUNCHER.ico",
