@@ -1181,8 +1181,15 @@ function createWindow() {
         }
     });
 
-    // សម្អាត Cache ទាំងអស់មុនពេល Load UI ដើម្បីធានាថាបាន index.html ថ្មី ១០០%
-    session.defaultSession.clearCache().then(() => {
+    // ជម្រះ Cache, Code Cache, Service Workers និង Storage Data ទាំងអស់ដើម្បីកុំឱ្យជាប់ UI ចាស់
+    session.defaultSession.clearStorageData({
+        storages: ['appcache', 'cookies', 'filesystem', 'indexdb', 'localstorage', 'shadercache', 'websql', 'serviceworkers', 'cachestorage']
+    }).then(() => {
+        return session.defaultSession.clearCache();
+    }).then(() => {
+        mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    }).catch(err => {
+        console.warn('[Cache Clear Warning]:', err.message);
         mainWindow.loadFile(path.join(__dirname, 'index.html'));
     });
 
